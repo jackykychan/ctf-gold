@@ -154,28 +154,30 @@ export function ChangeCards({ data, mode, locale }: ChangeCardsProps) {
 
   return (
     <Card id="cards-panel" className="p-4 lg:flex lg:h-[440px] lg:flex-col">
-      <div className="relative mb-3 flex items-center justify-between gap-2">
-        <h2 id="cards-heading" className="text-base font-semibold">
-          {t(locale, "label.changes")}
-        </h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <h2 id="cards-heading" className="text-base font-semibold">
+            {t(locale, "label.changes")}
+          </h2>
 
-        {/* Desktop only, absolutely centered in the row so it doesn't shift the
-            heading or filter; invisible (but present) while scrolled to the top. */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={scrollCardToTop}
-          aria-hidden={listAtTop}
-          tabIndex={listAtTop ? -1 : 0}
-          className={cn(
-            "absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 gap-1 text-muted-foreground lg:inline-flex",
-            listAtTop && "lg:invisible",
-          )}
-        >
-          <ArrowUp />
-          {t(locale, "cards.backToTop")}
-        </Button>
+          {/* Desktop only, immediately to the right of the title; invisible (but
+              present, to avoid layout shift) while the list is scrolled to top. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={scrollCardToTop}
+            aria-hidden={listAtTop}
+            tabIndex={listAtTop ? -1 : 0}
+            className={cn(
+              "hidden gap-1 text-muted-foreground lg:inline-flex",
+              listAtTop && "lg:invisible",
+            )}
+          >
+            <ArrowUp />
+            {t(locale, "cards.backToTop")}
+          </Button>
+        </div>
 
         <ToggleGroup
           type="single"

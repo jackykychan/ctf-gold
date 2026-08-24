@@ -116,14 +116,13 @@
   }
 }
 
-/* Floating back-to-top button: offset from the safe area so it clears the iOS
-   home indicator and Safari's bottom toolbar hot-zone. */
+/* Floating back-to-top button: horizontally centred near the top of the screen,
+   offset below the browser's top chrome (status bar / address bar) so the two
+   never overlap. env() is 0 off iOS; the extra clears a top URL bar. */
 .back-to-top-fab {
-  /* Sit well above iOS Safari's floating bottom bar + its tap-to-expand zone,
-     which otherwise eats the first tap. Generous for now; can be reduced once
-     confirmed. env() is 0 off iOS. */
-  bottom: calc(env(safe-area-inset-bottom) + 5rem);
-  right: calc(env(safe-area-inset-right) + 1.5rem);
+  top: calc(env(safe-area-inset-top) + 3.25rem);
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 /* Continuous marquee: the track holds two copies of the text and scrolls left by
