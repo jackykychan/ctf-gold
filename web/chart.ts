@@ -28,7 +28,11 @@ export function createPriceChart(canvas: HTMLCanvasElement): Chart {
       scales: {
         x: {
           type: "time",
-          time: { tooltipFormat: "yyyy-MM-dd" },
+          time: {
+            tooltipFormat: "yyyy-MM-dd",
+            // Compact day/month axis labels (e.g. 22/8) at every zoom unit.
+            displayFormats: { day: "d/M", week: "d/M", month: "d/M", quarter: "d/M", year: "d/M" },
+          },
           ticks: { maxRotation: 0, autoSkip: true },
         },
         y: { ticks: { callback: (v) => Number(v).toLocaleString() } },
