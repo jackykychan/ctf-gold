@@ -54,9 +54,10 @@ export function BackToTop({ locale }: BackToTopProps) {
       onClick={onClick}
       aria-label={t(locale, "cards.backToTop")}
       className={cn(
-        // bottom-16 (not bottom-6): keep the whole button above iOS Safari's
-        // bottom-edge hot-zone, which otherwise reveals the toolbar on first tap.
-        "fixed bottom-16 right-6 z-50 rounded-full shadow-md transition-opacity duration-200 lg:hidden",
+        // Positioned via .back-to-top-fab using env(safe-area-inset-*) (with
+        // viewport-fit=cover) so it clears the iOS home indicator + Safari's
+        // bottom-toolbar hot-zone instead of triggering the toolbar on first tap.
+        "back-to-top-fab fixed z-50 rounded-full shadow-md transition-opacity duration-200 lg:hidden",
         atTop
           ? "pointer-events-none opacity-0"
           : scrolling
