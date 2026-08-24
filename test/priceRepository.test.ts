@@ -34,6 +34,34 @@ test("latest returns null for an empty series", async () => {
   assert.equal(await repo.latestUpdateDate(6), null);
 });
 
+test("historyWindow returns the window plus the one preceding row", async () => {
+  const repo = createRepository(createDb(":memory:"));
+  await repo.insertIfNew(6, 100, "2026-08-01 09:00:00.0", "x");
+  await repo.insertIfNew(6, 110, "2026-08-05 09:00:00.0", "x");
+  await repo.insertIfNew(6, 120, "2026-08-10 09:00:00.0", "x");
+
+  const win = await repo.historyWindow(6, "2026-08-05 00:00:00");
+  assert.equal(win.preceding?.price, 100); // baseline just before the window
+  assert.deepEqual(
+    win.rows.map((r) => r.price),
+    [110, 120],
+  );
+
+  // Window covering everything: no preceding row.
+  const all = await repo.historyWindow(6, "2026-07-01 00:00:00");
+  assert.equal(all.preceding, null);
+  assert.equal(all.rows.length, 3);
+});
+
+test("latestBeforeDay returns the last row before the boundary", async () => {
+  const repo = createRepository(createDb(":memory:"));
+  await repo.insertIfNew(8, 40, "2026-08-22 15:00:00.0", "x");
+  await repo.insertIfNew(8, 41, "2026-08-22 16:00:00.0", "x"); // previous day's close
+  await repo.insertIfNew(8, 42, "2026-08-23 09:00:00.0", "x");
+  assert.equal((await repo.latestBeforeDay(8, "2026-08-23 00:00:00"))?.price, 41);
+  assert.equal(await repo.latestBeforeDay(8, "2026-08-22 00:00:00"), null);
+});
+
 test("meta get/set round-trips and upserts", async () => {
   const repo = createRepository(createDb(":memory:"));
   assert.equal(await repo.getMeta("last_polled_at"), null);

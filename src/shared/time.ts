@@ -26,3 +26,16 @@ export function truncateToSecond(s: string): string {
 export function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
 }
+
+/**
+ * Format a Date as a "YYYY-MM-DD HH:MM:SS" wall-clock string — the inverse of
+ * `parseApiDate` (both use local-time components), so it can build SQL cutoffs
+ * that compare lexicographically against stored `update_date` values.
+ */
+export function formatWallClock(d: Date): string {
+  const p = (n: number): string => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}

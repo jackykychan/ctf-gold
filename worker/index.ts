@@ -31,6 +31,21 @@ export default {
       const { repository, config } = deps(env);
       const service = createHistoryService(repository);
       const api = createApiRouter({ service, repository, config });
+
+      // Edge-cache the cacheable GETs so repeat/auto-refresh reads (and multiple
+      // visitors) are served from Cloudflare's cache instead of D1. TTL follows
+      // each response's Cache-Control.
+      const cacheable =
+        request.method === "GET" &&
+        (url.pathname === "/api/history" || url.pathname === "/api/latest");
+      if (cacheable) {
+        const cache = caches.default;
+        const hit = await cache.match(request);
+        if (hit) return hit;
+        const res = await api.fetch(request, env, ctx);
+        if (res.ok) ctx.waitUntil(cache.put(request, res.clone()));
+        return res;
+      }
       return api.fetch(request, env, ctx);
     }
 

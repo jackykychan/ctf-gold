@@ -6,6 +6,18 @@ interface Row {
   origin_price: number;
 }
 
+/** Newest row strictly before `boundary`, or null. */
+async function beforeRow(db: D1Database, code: number, boundary: string): Promise<RawPoint | null> {
+  const r = await db
+    .prepare(
+      `SELECT update_date, origin_price FROM price_points
+       WHERE price_code = ? AND update_date < ? ORDER BY update_date DESC LIMIT 1`,
+    )
+    .bind(code, boundary)
+    .first<Row>();
+  return r ? { updateDate: r.update_date, price: r.origin_price } : null;
+}
+
 /** Cloudflare D1 (async, SQLite-compatible) backend — production. */
 export function createD1Repository(db: D1Database): PriceRepository {
   return {
@@ -28,6 +40,21 @@ export function createD1Repository(db: D1Database): PriceRepository {
         .bind(code)
         .all<Row>();
       return res.results.map((r) => ({ updateDate: r.update_date, price: r.origin_price }));
+    },
+    async historyWindow(code, since) {
+      const res = await db
+        .prepare(
+          `SELECT update_date, origin_price FROM price_points
+           WHERE price_code = ? AND update_date >= ? ORDER BY update_date ASC`,
+        )
+        .bind(code, since)
+        .all<Row>();
+      const rows = res.results.map((r) => ({ updateDate: r.update_date, price: r.origin_price }));
+      const preceding = await beforeRow(db, code, since);
+      return { preceding, rows };
+    },
+    async latestBeforeDay(code, boundary) {
+      return beforeRow(db, code, boundary);
     },
     async latest(code) {
       const row = await db

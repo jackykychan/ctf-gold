@@ -22,6 +22,14 @@ export function createRepository(db: DB): PriceRepository {
     `SELECT update_date, origin_price FROM price_points
      WHERE price_code = ? ORDER BY update_date DESC LIMIT 1`,
   );
+  const windowStmt = db.prepare(
+    `SELECT update_date, origin_price FROM price_points
+     WHERE price_code = ? AND update_date >= ? ORDER BY update_date ASC`,
+  );
+  const beforeStmt = db.prepare(
+    `SELECT update_date, origin_price FROM price_points
+     WHERE price_code = ? AND update_date < ? ORDER BY update_date DESC LIMIT 1`,
+  );
   const getMetaStmt = db.prepare(`SELECT value FROM meta WHERE key = ?`);
   const setMetaStmt = db.prepare(
     `INSERT INTO meta (key, value) VALUES (?, ?)
@@ -36,6 +44,19 @@ export function createRepository(db: DB): PriceRepository {
     async historyForCode(code) {
       const rows = historyStmt.all(code) as Row[];
       return rows.map((r) => ({ updateDate: r.update_date, price: r.origin_price }));
+    },
+    async historyWindow(code, since) {
+      const rows = (windowStmt.all(code, since) as Row[]).map((r) => ({
+        updateDate: r.update_date,
+        price: r.origin_price,
+      }));
+      const p = beforeStmt.get(code, since) as Row | undefined;
+      const preceding = p ? { updateDate: p.update_date, price: p.origin_price } : null;
+      return { preceding, rows };
+    },
+    async latestBeforeDay(code, boundary) {
+      const r = beforeStmt.get(code, boundary) as Row | undefined;
+      return r ? { updateDate: r.update_date, price: r.origin_price } : null;
     },
     async latest(code) {
       const row = latestStmt.get(code) as Row | undefined;
