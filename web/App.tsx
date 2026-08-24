@@ -119,7 +119,7 @@ export function App() {
       />
 
       <main className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[2fr_1fr]">
-        <PriceChart data={history} mode={mode} locale={locale} theme={resolvedTheme} />
+        <PriceChart data={history} mode={mode} locale={locale} theme={resolvedTheme} range={range} />
         <ChangeCards data={history} mode={mode} locale={locale} />
       </main>
 

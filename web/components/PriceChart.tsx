@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Chart } from "chart.js";
-import type { HistoryResponse } from "../../src/shared/types";
+import type { HistoryResponse, Range } from "../../src/shared/types";
 import { createPriceChart, updateChart, type ViewMode } from "@/chart";
 import type { Locale } from "@/i18n";
 import type { ResolvedTheme } from "@/theme";
@@ -11,11 +11,15 @@ interface PriceChartProps {
   mode: ViewMode;
   locale: Locale;
   theme: ResolvedTheme;
+  range: Range;
 }
 
-export function PriceChart({ data, mode, locale, theme }: PriceChartProps) {
+export function PriceChart({ data, mode, locale, theme, range }: PriceChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
+  // Play the left-to-right draw on first render and whenever a filter (range or
+  // mode) changes — but not on the 60s background refresh or theme/locale swaps.
+  const drawNext = useRef(true);
 
   useEffect(() => {
     if (canvasRef.current) chartRef.current = createPriceChart(canvasRef.current);
@@ -25,8 +29,17 @@ export function PriceChart({ data, mode, locale, theme }: PriceChartProps) {
     };
   }, []);
 
+  // Arm the draw when a filter changes. Runs before the render effect below so
+  // the flag is set when the (possibly newly fetched) data is drawn.
   useEffect(() => {
-    if (chartRef.current && data) updateChart(chartRef.current, data, mode, locale);
+    drawNext.current = true;
+  }, [range, mode]);
+
+  useEffect(() => {
+    if (chartRef.current && data) {
+      updateChart(chartRef.current, data, mode, locale, drawNext.current);
+      drawNext.current = false;
+    }
     // `theme` is a dependency so the chart re-reads themed CSS colors on toggle.
   }, [data, mode, locale, theme]);
 

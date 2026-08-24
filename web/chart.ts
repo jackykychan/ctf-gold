@@ -16,51 +16,53 @@ function toXY(points: readonly { t: string; price: number }[]): { x: number; y: 
   return points.map((p) => ({ x: parseApiDate(p.t).getTime(), y: p.price }));
 }
 
-// Total time for the initial left-to-right line draw.
+// Duration of the left-to-right line-draw reveal.
 const DRAW_MS = 900;
 
-/**
- * Chart.js "progressive line" animation: each point — and the segment reaching
- * it — appears in index order (left to right) over DRAW_MS. Used only for the
- * first render; later updates use a plain, quick transition.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function progressiveDrawAnimation(): any {
-  const per = (ctx: any) =>
-    DRAW_MS / Math.max((ctx.chart.data.datasets[ctx.datasetIndex]?.data.length ?? 1) - 1, 1);
-  const previousY = (ctx: any) =>
-    ctx.index === 0
-      ? ctx.chart.scales.y.getPixelForValue(ctx.chart.scales.y.min)
-      : ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.index - 1].getProps(["y"], true).y;
-  return {
-    x: {
-      type: "number",
-      easing: "linear",
-      duration: per,
-      from: NaN, // point is skipped until its turn
-      delay(ctx: any) {
-        if (ctx.type !== "data" || ctx.xStarted) return 0;
-        ctx.xStarted = true;
-        return ctx.index * per(ctx);
-      },
-    },
-    y: {
-      type: "number",
-      easing: "linear",
-      duration: per,
-      from: previousY,
-      delay(ctx: any) {
-        if (ctx.type !== "data" || ctx.yStarted) return 0;
-        ctx.yStarted = true;
-        return ctx.index * per(ctx);
-      },
-    },
+type DrawState = { clip?: number; raf?: number };
+const drawStateOf = (chart: Chart): DrawState => chart as Chart & DrawState;
+
+// Reveals the datasets left-to-right by clipping the canvas to a growing width.
+// Because the final curve is rendered once and merely unveiled, the motion is
+// perfectly smooth regardless of how many points the series has.
+const drawClipPlugin = {
+  id: "drawClip",
+  beforeDatasetsDraw(chart: Chart) {
+    const p = drawStateOf(chart).clip;
+    if (p == null || p >= 1) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(chartArea.left, chartArea.top, (chartArea.right - chartArea.left) * p, chartArea.bottom - chartArea.top);
+    ctx.clip();
+  },
+  afterDatasetsDraw(chart: Chart) {
+    const p = drawStateOf(chart).clip;
+    if (p == null || p >= 1) return;
+    chart.ctx.restore();
+  },
+};
+
+const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+// Animate the clip from 0 → 1 over DRAW_MS, redrawing each frame.
+function playDrawReveal(chart: Chart): void {
+  const state = drawStateOf(chart);
+  if (state.raf) cancelAnimationFrame(state.raf);
+  const start = performance.now();
+  const tick = (now: number) => {
+    const progress = Math.min((now - start) / DRAW_MS, 1);
+    state.clip = easeOutCubic(progress);
+    chart.draw();
+    state.raf = progress < 1 ? requestAnimationFrame(tick) : undefined;
   };
+  state.raf = requestAnimationFrame(tick);
 }
 
 export function createPriceChart(canvas: HTMLCanvasElement): Chart {
   return new Chart(canvas, {
     type: "line",
+    plugins: [drawClipPlugin],
     data: { datasets: [] },
     options: {
       responsive: true,
@@ -89,6 +91,7 @@ export function updateChart(
   data: HistoryResponse,
   mode: ViewMode,
   locale: Locale,
+  animate: boolean,
 ): void {
   const sellColor = cssVar("--series-sell") || "#d4a017";
   const buyColor = cssVar("--series-buy") || "#2a9d8f";
@@ -137,17 +140,20 @@ export function updateChart(
   const legend = chart.options.plugins!.legend!;
   legend.labels = { ...legend.labels, color: textColor };
 
-  // Draw left-to-right on the first render only; keep later refreshes/toggles
-  // to a quick, plain transition so the line doesn't re-draw every 60s.
-  const c = chart as Chart & { __drawn?: boolean };
-  if (!c.__drawn) {
-    c.__drawn = true;
-    chart.options.animations = progressiveDrawAnimation();
-    chart.options.animation = { duration: DRAW_MS };
+  const state = drawStateOf(chart);
+  if (animate) {
+    // Snap the final curve into place (no point morphing), then unveil it
+    // left-to-right. Used on first render and whenever a filter changes.
+    chart.options.animation = false;
+    state.clip = 0;
+    chart.update("none");
+    playDrawReveal(chart);
   } else {
-    chart.options.animations = {};
+    // Background refresh: quick, plain transition; no re-draw wipe.
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.raf = undefined;
+    state.clip = 1;
     chart.options.animation = { duration: 300 };
+    chart.update();
   }
-
-  chart.update();
 }
