@@ -1,0 +1,10 @@
+node_modules/
+dist/
+data/
+public/app.js
+public/app.js.map
+public/styles.css
+coverage/
+.env
+*.log
+.DS_Store
