@@ -54,7 +54,7 @@ export function BackToTop({ locale }: BackToTopProps) {
       onClick={onClick}
       aria-label={t(locale, "cards.backToTop")}
       className={cn(
-        "fixed bottom-4 right-4 z-50 rounded-full shadow-md transition-opacity duration-200 lg:hidden",
+        "fixed bottom-6 right-6 z-50 rounded-full shadow-md transition-opacity duration-200 lg:hidden",
         atTop
           ? "pointer-events-none opacity-0"
           : scrolling
