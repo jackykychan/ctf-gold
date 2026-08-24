@@ -74,6 +74,57 @@ test("GET /api/latest changePct is null with only one day of data", async () => 
   assert.equal(body.buy.changePct, null);
 });
 
+function routerWithSecret(repo: ReturnType<typeof createRepository>, secret: string) {
+  return createApiRouter({
+    service: createHistoryService(repo),
+    repository: repo,
+    config: loadConfig({ SYNC_SECRET: secret }),
+  });
+}
+
+test("POST /api/import rejects without the correct secret", async () => {
+  const app = routerWithSecret(createRepository(createDb(":memory:")), "s3cr3t");
+  const post = (headers: Record<string, string>) =>
+    app.request("/api/import", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify({ points: [] }),
+    });
+  assert.equal((await post({})).status, 401);
+  assert.equal((await post({ Authorization: "Bearer nope" })).status, 401);
+});
+
+test("POST /api/import inserts manual points and is idempotent", async () => {
+  const repo = createRepository(createDb(":memory:"));
+  const app = routerWithSecret(repo, "s3cr3t");
+  const headers = { "content-type": "application/json", Authorization: "Bearer s3cr3t" };
+  const body = JSON.stringify({
+    points: [
+      { code: 6, date: "2026-06-25", price: 44975 },
+      { code: 8, date: "2026-06-25", price: 36999 },
+    ],
+  });
+  const first = await (await app.request("/api/import", { method: "POST", headers, body })).json();
+  assert.deepEqual(first, { received: 2, inserted: 2, skipped: 0 });
+  const again = (await (await app.request("/api/import", { method: "POST", headers, body })).json()) as any;
+  assert.equal(again.inserted, 0);
+  assert.equal((await repo.historyForCode(6))[0]!.price, 44975);
+});
+
+test("GET /api/daily-high returns per-day maxima since a date", async () => {
+  const repo = createRepository(createDb(":memory:"));
+  await repo.insertIfNew(6, 100, "2026-06-25 09:00:00.0", "x");
+  await repo.insertIfNew(6, 120, "2026-06-25 13:00:00.0", "x"); // day high
+  await repo.insertIfNew(6, 130, "2026-06-26 10:00:00.0", "x");
+  const app = routerWithSecret(repo, "");
+  const body = (await (await app.request("/api/daily-high?since=2026-06-25")).json()) as any;
+  assert.deepEqual(body.sell, [
+    { date: "2026-06-25", price: 120 },
+    { date: "2026-06-26", price: 130 },
+  ]);
+  assert.deepEqual(body.buy, []);
+});
+
 test("GET /api/health: starting -> ok -> degraded by poll liveness", async () => {
   const repo = createRepository(createDb(":memory:"));
   const app = routerFor(repo);

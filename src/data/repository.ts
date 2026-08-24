@@ -8,6 +8,11 @@ import type { RawPoint } from "../domain/changes";
 export interface PriceRepository {
   /** Insert a point unless (code, updateDate) already exists. Returns true if inserted. */
   insertIfNew(code: number, price: number, updateDate: string, fetchedAt: string): Promise<boolean>;
+  /** Bulk insert-if-new (for the Sheet import), tagging every row with `source`. */
+  insertManyIfNew(
+    rows: ReadonlyArray<{ code: number; price: number; updateDate: string; fetchedAt: string }>,
+    source: string,
+  ): Promise<{ inserted: number; skipped: number }>;
   /** Full history for a series, ascending by update time. */
   historyForCode(code: number): Promise<RawPoint[]>;
   /**

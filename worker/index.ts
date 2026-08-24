@@ -9,12 +9,13 @@ import { createD1Repository } from "./d1Repository";
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
-  // String vars from wrangler [vars]; read by loadConfig.
+  // String vars from wrangler [vars] / secrets; read by loadConfig.
   API_URL?: string;
   HEALTH_STALE_AFTER_MIN?: string;
   START_POLL_INTERVAL_MIN?: string;
   MIN_POLL_INTERVAL_MIN?: string;
   MAX_POLL_INTERVAL_MIN?: string;
+  SYNC_SECRET?: string;
 }
 
 function deps(env: Env) {
@@ -37,7 +38,9 @@ export default {
       // each response's Cache-Control.
       const cacheable =
         request.method === "GET" &&
-        (url.pathname === "/api/history" || url.pathname === "/api/latest");
+        (url.pathname === "/api/history" ||
+          url.pathname === "/api/latest" ||
+          url.pathname === "/api/daily-high");
       if (cacheable) {
         const cache = caches.default;
         const hit = await cache.match(request);

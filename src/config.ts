@@ -38,6 +38,8 @@ export interface AppConfig {
   pollStreakThreshold: number;
   /** /api/health reports degraded if the last poll is older than this many minutes. */
   healthStaleAfterMin: number;
+  /** Bearer secret required to write via /api/import; empty disables the endpoint. */
+  syncSecret: string;
 }
 
 /** Anything with string-or-undefined values: `process.env` or a Worker `env` binding. */
@@ -77,5 +79,6 @@ export function loadConfig(env: EnvSource = processEnv()): AppConfig {
     pollIncrementMin: num(env, "POLL_INCREMENT_MIN", 15),
     pollStreakThreshold: num(env, "POLL_STREAK_THRESHOLD", 3),
     healthStaleAfterMin: num(env, "HEALTH_STALE_AFTER_MIN", 30),
+    syncSecret: str(env, "SYNC_SECRET", ""),
   };
 }

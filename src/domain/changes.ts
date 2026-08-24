@@ -48,7 +48,7 @@ export interface DailyPoint {
  * one point per day, ascending by time, carrying the timestamp at which that
  * day's high occurred.
  */
-export function dailyHigh(points: readonly PricePoint[]): DailyPoint[] {
+export function dailyHigh(points: readonly { t: string; price: number }[]): DailyPoint[] {
   const byDay = new Map<string, DailyPoint>();
   for (const p of points) {
     const day = p.t.slice(0, 10);

@@ -31,6 +31,18 @@ export function createD1Repository(db: D1Database): PriceRepository {
         .run();
       return (res.meta.changes ?? 0) > 0;
     },
+    async insertManyIfNew(rows, source) {
+      if (rows.length === 0) return { inserted: 0, skipped: 0 };
+      const stmt = db.prepare(
+        `INSERT OR IGNORE INTO price_points (price_code, origin_price, update_date, fetched_at, source)
+         VALUES (?, ?, ?, ?, ?)`,
+      );
+      const results = await db.batch(
+        rows.map((r) => stmt.bind(r.code, r.price, r.updateDate, r.fetchedAt, source)),
+      );
+      const inserted = results.reduce((n, res) => n + (res.meta.changes ?? 0), 0);
+      return { inserted, skipped: rows.length - inserted };
+    },
     async historyForCode(code) {
       const res = await db
         .prepare(
