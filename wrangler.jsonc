@@ -19,7 +19,7 @@
     {
       "binding": "DB",
       "database_name": "ctf-gold",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "95651b21-f8f2-4a83-8b24-7c56269b8fdb",
       "migrations_dir": "migrations"
     }
   ],
