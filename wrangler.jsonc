@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ctf-gold",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+
+  // Static frontend (built into ./public). not_found_handling "none" lets the
+  // Worker do its own SPA fallback to index.html for client-side routes.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+
+  // D1 database. Fill "database_id" after `npm run cf:db:create` (or the
+  // `wrangler d1 create ctf-gold` it runs).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ctf-gold",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Poll the upstream API every 10 minutes (light + respectful; ~144 calls/day).
+  "triggers": { "crons": ["*/10 * * * *"] },
+
+  "vars": {
+    "API_URL": "https://www.chowtaifook.com/bin/servlet/ctfweb/goldPrice?region=HK",
+    "HEALTH_STALE_AFTER_MIN": "30"
+  }
+}

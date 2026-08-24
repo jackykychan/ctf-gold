@@ -36,33 +36,46 @@ export interface AppConfig {
   pollIncrementMin: number;
   /** No-change polls at one interval before backing off. */
   pollStreakThreshold: number;
+  /** /api/health reports degraded if the last poll is older than this many minutes. */
+  healthStaleAfterMin: number;
 }
 
-function num(name: string, fallback: number): number {
-  const raw = process.env[name];
+/** Anything with string-or-undefined values: `process.env` or a Worker `env` binding. */
+export type EnvSource = Record<string, string | undefined>;
+
+function num(env: EnvSource, name: string, fallback: number): number {
+  const raw = env[name];
   if (raw === undefined || raw === "") return fallback;
   const n = Number(raw);
   if (!Number.isFinite(n)) throw new Error(`Env ${name} must be a number, got "${raw}"`);
   return n;
 }
 
-function str(name: string, fallback: string): string {
-  const raw = process.env[name];
+function str(env: EnvSource, name: string, fallback: string): string {
+  const raw = env[name];
   return raw === undefined || raw === "" ? fallback : raw;
 }
 
-export function loadConfig(): AppConfig {
+/** Read `process.env` without referencing the Node global directly (Worker-safe). */
+function processEnv(): EnvSource {
+  return (globalThis as { process?: { env?: EnvSource } }).process?.env ?? {};
+}
+
+/** Build config from an env source (defaults to Node's `process.env`). */
+export function loadConfig(env: EnvSource = processEnv()): AppConfig {
   return {
-    port: num("PORT", 3000),
-    dbPath: str("DB_PATH", "./data/gold.db"),
+    port: num(env, "PORT", 3000),
+    dbPath: str(env, "DB_PATH", "./data/gold.db"),
     apiUrl: str(
+      env,
       "API_URL",
       "https://www.chowtaifook.com/bin/servlet/ctfweb/goldPrice?region=HK",
     ),
-    startPollIntervalMin: num("START_POLL_INTERVAL_MIN", 15),
-    minPollIntervalMin: num("MIN_POLL_INTERVAL_MIN", 5),
-    maxPollIntervalMin: num("MAX_POLL_INTERVAL_MIN", 120),
-    pollIncrementMin: num("POLL_INCREMENT_MIN", 15),
-    pollStreakThreshold: num("POLL_STREAK_THRESHOLD", 3),
+    startPollIntervalMin: num(env, "START_POLL_INTERVAL_MIN", 15),
+    minPollIntervalMin: num(env, "MIN_POLL_INTERVAL_MIN", 5),
+    maxPollIntervalMin: num(env, "MAX_POLL_INTERVAL_MIN", 120),
+    pollIncrementMin: num(env, "POLL_INCREMENT_MIN", 15),
+    pollStreakThreshold: num(env, "POLL_STREAK_THRESHOLD", 3),
+    healthStaleAfterMin: num(env, "HEALTH_STALE_AFTER_MIN", 30),
   };
 }

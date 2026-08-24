@@ -14,6 +14,7 @@ const config: AppConfig = {
   maxPollIntervalMin: 120,
   pollIncrementMin: 15,
   pollStreakThreshold: 3,
+  healthStaleAfterMin: 30,
 };
 
 const sample = {
@@ -37,8 +38,8 @@ test("poller fetches, parses and stores both series on boot", async () => {
   poller.stop();
 
   assert.equal(fetches, 1);
-  assert.equal(repo.latest(6)?.price, 52589);
-  assert.equal(repo.latest(8)?.price, 41959);
+  assert.equal((await repo.latest(6))?.price, 52589);
+  assert.equal((await repo.latest(8))?.price, 41959);
 });
 
 test("poller dedupes an unchanged updateDate across polls", async () => {
@@ -48,11 +49,11 @@ test("poller dedupes an unchanged updateDate across polls", async () => {
   await poller.start();
   poller.stop();
   // Pre-seed the same point, then poll again via a fresh poller: no duplicate row.
-  const before = repo.historyForCode(6).length;
+  const before = (await repo.historyForCode(6)).length;
   const poller2 = createPoller({ client, repository: repo, config, logger: silent });
   await poller2.start();
   poller2.stop();
-  assert.equal(repo.historyForCode(6).length, before); // still one row
+  assert.equal((await repo.historyForCode(6)).length, before); // still one row
 });
 
 test("poller survives a fetch error without throwing and stores nothing", async () => {
@@ -72,6 +73,6 @@ test("poller survives a fetch error without throwing and stores nothing", async 
   await poller.start();
   poller.stop();
 
-  assert.equal(repo.latest(6), null);
+  assert.equal(await repo.latest(6), null);
   assert.ok(errors.some((e) => /Poll failed/.test(e)));
 });

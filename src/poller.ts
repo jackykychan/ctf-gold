@@ -1,13 +1,14 @@
 import { CANONICAL_SERIES_KEY, seriesByKey, type AppConfig } from "./config";
 import type { GoldPriceClient } from "./api/goldPriceClient";
-import { parseGoldPrice } from "./api/parseGoldPrice";
-import type { PriceRepository } from "./data/priceRepository";
+import type { PriceRepository } from "./data/repository";
+import { runPollOnce } from "./pollCore";
 import {
   decideNext,
   initialState,
   type PollState,
   type SchedulerConfig,
 } from "./domain/scheduler";
+import { META_LAST_POLLED } from "./shared/types";
 
 export interface Logger {
   info: (msg: string) => void;
@@ -28,9 +29,9 @@ export interface Poller {
 }
 
 /**
- * Orchestrates the adaptive polling loop: fetch -> parse -> store new points ->
- * ask the pure scheduler for the next delay -> setTimeout. All decision logic
- * lives in `scheduler`; this module only does I/O and timing.
+ * Node local-dev poller: the adaptive self-scheduling loop. Runs `runPollOnce`,
+ * then asks the pure `scheduler` for the next delay and `setTimeout`s it. (In
+ * production the Worker uses a fixed Cron trigger instead — see worker/index.ts.)
  */
 export function createPoller({ client, repository, config, logger }: PollerDeps): Poller {
   const log = logger ?? { info: console.log, error: console.error };
@@ -48,10 +49,6 @@ export function createPoller({ client, repository, config, logger }: PollerDeps)
   let timer: NodeJS.Timeout | null = null;
   let stopped = false;
 
-  // Resume backoff state across restarts from the newest stored point.
-  const seeded = repository.latestUpdateDate(canonicalCode);
-  if (seeded) state = { ...state, lastSeenUpdateDate: seeded };
-
   function schedule(delayMin: number): void {
     if (stopped) return;
     const ms = Math.max(1, delayMin) * 60_000;
@@ -63,40 +60,42 @@ export function createPoller({ client, repository, config, logger }: PollerDeps)
 
   async function tick(): Promise<void> {
     if (stopped) return;
-    const fetchedAt = new Date().toISOString();
     try {
-      const raw = await client.fetchRaw();
-      const points = parseGoldPrice(raw);
+      const { inserted, canonicalUpdateDate } = await runPollOnce({
+        client,
+        repository,
+        canonicalCode,
+      });
 
-      let inserted = 0;
-      let canonicalUpdate: string | null = null;
-      for (const p of points) {
-        if (repository.insertIfNew(p.code, p.price, p.updateDate, fetchedAt)) inserted++;
-        if (p.code === canonicalCode) canonicalUpdate = p.updateDate;
-      }
-
-      if (canonicalUpdate === null) {
+      if (canonicalUpdateDate === null) {
         log.error("Poll succeeded but canonical series was absent; retrying at current interval");
         schedule(state.currentIntervalMin);
         return;
       }
 
-      const decision = decideNext(state, canonicalUpdate, schedCfg);
+      const decision = decideNext(state, canonicalUpdateDate, schedCfg);
       state = decision.nextState;
       log.info(
         `Poll ok: ${inserted} new point(s); ${decision.changed ? "CHANGED" : "no change"} ` +
-          `@ ${canonicalUpdate}`,
+          `@ ${canonicalUpdateDate}`,
       );
       schedule(decision.nextDelayMin);
     } catch (err) {
       log.error(`Poll failed: ${(err as Error).message}`);
       schedule(state.currentIntervalMin);
+    } finally {
+      // Record liveness regardless of outcome so /api/health can tell a stalled
+      // poller from a quiet upstream.
+      await repository.setMeta(META_LAST_POLLED, new Date().toISOString());
     }
   }
 
   return {
     async start() {
       stopped = false;
+      // Resume backoff state across restarts from the newest stored point.
+      const seeded = await repository.latestUpdateDate(canonicalCode);
+      if (seeded) state = { ...state, lastSeenUpdateDate: seeded };
       await tick();
     },
     stop() {
