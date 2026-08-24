@@ -30,6 +30,10 @@ export function createRepository(db: DB): PriceRepository {
     `SELECT update_date, origin_price FROM price_points
      WHERE price_code = ? AND update_date < ? ORDER BY update_date DESC LIMIT 1`,
   );
+  const insertSourcedStmt = db.prepare(
+    `INSERT OR IGNORE INTO price_points (price_code, origin_price, update_date, fetched_at, source)
+     VALUES (?, ?, ?, ?, ?)`,
+  );
   const getMetaStmt = db.prepare(`SELECT value FROM meta WHERE key = ?`);
   const setMetaStmt = db.prepare(
     `INSERT INTO meta (key, value) VALUES (?, ?)
@@ -40,6 +44,19 @@ export function createRepository(db: DB): PriceRepository {
     async insertIfNew(code, price, updateDate, fetchedAt) {
       const info = insertStmt.run(code, price, updateDate, fetchedAt);
       return info.changes > 0;
+    },
+    async insertManyIfNew(rows, source) {
+      const run = db.transaction(
+        (batch: ReadonlyArray<{ code: number; price: number; updateDate: string; fetchedAt: string }>) => {
+          let inserted = 0;
+          for (const r of batch) {
+            inserted += insertSourcedStmt.run(r.code, r.price, r.updateDate, r.fetchedAt, source).changes;
+          }
+          return inserted;
+        },
+      );
+      const inserted = run(rows) as number;
+      return { inserted, skipped: rows.length - inserted };
     },
     async historyForCode(code) {
       const rows = historyStmt.all(code) as Row[];

@@ -62,6 +62,31 @@ test("latestBeforeDay returns the last row before the boundary", async () => {
   assert.equal(await repo.latestBeforeDay(8, "2026-08-22 00:00:00"), null);
 });
 
+test("insertManyIfNew bulk-inserts, dedupes, and tags source", async () => {
+  const db = createDb(":memory:");
+  const repo = createRepository(db);
+  const res = await repo.insertManyIfNew(
+    [
+      { code: 6, price: 44975, updateDate: "2026-06-25 00:00:00", fetchedAt: "x" },
+      { code: 8, price: 36999, updateDate: "2026-06-25 00:00:00", fetchedAt: "x" },
+      { code: 6, price: 45327, updateDate: "2026-06-26 00:00:00", fetchedAt: "x" },
+    ],
+    "manual",
+  );
+  assert.deepEqual(res, { inserted: 3, skipped: 0 });
+
+  // Re-running is idempotent (dedupe on code+update_date).
+  const again = await repo.insertManyIfNew(
+    [{ code: 6, price: 44975, updateDate: "2026-06-25 00:00:00", fetchedAt: "x" }],
+    "manual",
+  );
+  assert.deepEqual(again, { inserted: 0, skipped: 1 });
+
+  assert.equal((await repo.historyForCode(6)).length, 2);
+  const src = db.prepare("SELECT DISTINCT source FROM price_points").pluck().all();
+  assert.deepEqual(src, ["manual"]);
+});
+
 test("meta get/set round-trips and upserts", async () => {
   const repo = createRepository(createDb(":memory:"));
   assert.equal(await repo.getMeta("last_polled_at"), null);

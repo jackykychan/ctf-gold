@@ -1,11 +1,14 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-import type { AppConfig } from "../config";
+import { PRICE_SERIES, type AppConfig } from "../config";
+import { dailyHigh } from "../domain/changes";
+import { toImportPoints } from "../domain/importPoints";
 import type { PriceRepository } from "../data/repository";
 import type { HistoryService } from "../services/historyService";
-import { META_LAST_POLLED, RANGES, type Range } from "../shared/types";
+import { META_LAST_POLLED, RANGES, type Range, type SeriesKey } from "../shared/types";
 
 const DEFAULT_RANGE: Range = "1m";
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isRange(v: unknown): v is Range {
   return typeof v === "string" && (RANGES as readonly string[]).includes(v);
@@ -38,6 +41,45 @@ export function createApiRouter({ service, repository, config }: ApiDeps): Hono 
   api.get("/api/latest", async (c) => {
     c.header("Cache-Control", "public, max-age=20");
     return c.json(await service.getLatest());
+  });
+
+  // Daily-high per series since `?since=YYYY-MM-DD` (default: all) — for the
+  // Google Sheet write-back. Public aggregated data, like /api/history.
+  api.get("/api/daily-high", async (c) => {
+    const since = c.req.query("since");
+    const boundary = since && ISO_DATE.test(since) ? `${since} 00:00:00` : "0000-01-01 00:00:00";
+    c.header("Cache-Control", "public, max-age=60");
+    const out = {} as Record<SeriesKey, { date: string; price: number }[]>;
+    for (const s of PRICE_SERIES) {
+      const { rows } = await repository.historyWindow(s.code, boundary);
+      out[s.key] = dailyHigh(rows.map((r) => ({ t: r.updateDate, price: r.price }))).map((h) => ({
+        date: h.t.slice(0, 10),
+        price: h.price,
+      }));
+    }
+    return c.json(out);
+  });
+
+  // Bulk import (Google Sheet historical data). Write endpoint — requires the
+  // shared secret. Rows dedupe on (code, update_date), so re-imports are no-ops.
+  api.post("/api/import", async (c) => {
+    const secret = config.syncSecret;
+    const auth = c.req.header("Authorization") ?? "";
+    if (!secret || auth !== `Bearer ${secret}`) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    let points;
+    try {
+      points = toImportPoints(await c.req.json());
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    const fetchedAt = new Date().toISOString();
+    const { inserted, skipped } = await repository.insertManyIfNew(
+      points.map((p) => ({ ...p, fetchedAt })),
+      "manual",
+    );
+    return c.json({ received: points.length, inserted, skipped });
   });
 
   // Liveness: degraded (503) when the poller/cron hasn't recorded a run recently,

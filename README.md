@@ -100,6 +100,14 @@ Local dev reads `process.env`; the Worker reads `vars` in `wrangler.jsonc`.
 | `API_URL` | Chow Tai Fook HK endpoint | Source API. |
 | `HEALTH_STALE_AFTER_MIN` | `30` | `/api/health` reports degraded past this poll age. |
 | `START/MIN/MAX_POLL_INTERVAL_MIN` | `15/5/120` | Local adaptive poller bounds (Node only). |
+| `SYNC_SECRET` | _(unset)_ | Bearer secret gating `POST /api/import`; empty disables it. Set via `wrangler secret put SYNC_SECRET`. |
+
+## Google Sheet sync
+
+A Google Apps Script bridges the manual **Gold Price** sheet with the site — a
+one-time historical import and an hourly daily-high write-back. See
+[`apps-script/README.md`](apps-script/README.md). Endpoints: `POST /api/import`
+(secret-gated bulk insert) and `GET /api/daily-high` (public).
 
 ## Polling
 
