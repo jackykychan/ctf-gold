@@ -120,7 +120,7 @@
    offset below the browser's top chrome (status bar / address bar) so the two
    never overlap. env() is 0 off iOS; the extra clears a top URL bar. */
 .back-to-top-fab {
-  top: calc(env(safe-area-inset-top) + 3.25rem);
+  top: env(safe-area-inset-top);
   left: 50%;
   transform: translateX(-50%);
 }
