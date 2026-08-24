@@ -22,7 +22,9 @@ function props_() {
   return PropertiesService.getScriptProperties();
 }
 function siteUrl_() {
-  return props_().getProperty("SITE_URL");
+  var u = props_().getProperty("SITE_URL");
+  if (!u) throw new Error("Script Property SITE_URL is not set");
+  return u.trim().replace(/\/+$/, ""); // tolerate a trailing slash
 }
 function secret_() {
   return props_().getProperty("SYNC_SECRET");
