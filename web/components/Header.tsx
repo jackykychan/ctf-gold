@@ -28,7 +28,7 @@ interface HeaderProps {
 
 export function Header({ locale, themeChoice, onThemeChange, onLocaleChange }: HeaderProps) {
   return (
-    <header className="mb-4 flex flex-nowrap items-center justify-between gap-3">
+    <header className="mb-4 flex flex-nowrap items-start justify-between gap-3">
       <div className="min-w-0">
         <h1 className="text-lg font-bold md:text-2xl">
           <Marquee text={t(locale, "app.title")} />
