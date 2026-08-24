@@ -11,6 +11,7 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
   en: {
     "app.title": "Gold Price Tracker",
     "app.subtitle": "Chow Tai Fook · 9999 Gold (HK)",
+    "source.link": "Official price page",
     "series.sell": "9999 Gold Sell",
     "series.buy": "9999 Gold Buy",
     "label.latest": "Latest",
@@ -40,6 +41,7 @@ export const STRINGS: Record<Locale, Record<string, string>> = {
   "zh-Hant": {
     "app.title": "金價追蹤",
     "app.subtitle": "周大福 · 飾金 9999（香港）",
+    "source.link": "官方金價頁面",
     "series.sell": "飾金賣出價",
     "series.buy": "飾金買入價",
     "label.latest": "最新",

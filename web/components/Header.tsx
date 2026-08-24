@@ -1,4 +1,4 @@
-import { Languages, Moon, Sun, SunMoon } from "lucide-react";
+import { ExternalLink, Languages, Moon, Sun, SunMoon } from "lucide-react";
 import type { ReactNode } from "react";
 import { t, type Locale, LOCALES } from "@/i18n";
 import { THEME_CHOICES, type ThemeChoice } from "@/theme";
@@ -15,6 +15,9 @@ const LANG_ABBREV: Record<Locale, string> = {
   en: "EN",
   "zh-Hant": "繁中",
 };
+
+const SOURCE_URL =
+  "https://www.chowtaifook.com/zh-hk/eshop/realtime-gold-price.html?tab=goldPellet";
 
 interface HeaderProps {
   locale: Locale;
@@ -33,6 +36,15 @@ export function Header({ locale, themeChoice, onThemeChange, onLocaleChange }: H
         <p className="text-xs text-muted-foreground md:text-sm">
           <Marquee text={t(locale, "app.subtitle")} />
         </p>
+        <a
+          href={SOURCE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground/80 underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          <ExternalLink className="size-3 shrink-0" />
+          {t(locale, "source.link")}
+        </a>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
