@@ -119,7 +119,10 @@
 /* Floating back-to-top button: offset from the safe area so it clears the iOS
    home indicator and Safari's bottom toolbar hot-zone. */
 .back-to-top-fab {
-  bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  /* Sit well above iOS Safari's floating bottom bar + its tap-to-expand zone,
+     which otherwise eats the first tap. Generous for now; can be reduced once
+     confirmed. env() is 0 off iOS. */
+  bottom: calc(env(safe-area-inset-bottom) + 5rem);
   right: calc(env(safe-area-inset-right) + 1.5rem);
 }
 
