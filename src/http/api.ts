@@ -29,16 +29,21 @@ export function createApiRouter({ service, repository, config }: ApiDeps): Hono 
 
   api.get("/api/history", async (c) => {
     const range: Range = isRange(c.req.query("range")) ? (c.req.query("range") as Range) : DEFAULT_RANGE;
+    // Cacheable: history changes at most a few times/day; 60s staleness is fine
+    // and lets the edge/browser absorb the dashboard's auto-refresh.
+    c.header("Cache-Control", "public, max-age=60");
     return c.json(await service.getHistory(range));
   });
 
   api.get("/api/latest", async (c) => {
+    c.header("Cache-Control", "public, max-age=20");
     return c.json(await service.getLatest());
   });
 
   // Liveness: degraded (503) when the poller/cron hasn't recorded a run recently,
   // so an external uptime monitor can alert on a silently stalled poller.
   api.get("/api/health", async (c) => {
+    c.header("Cache-Control", "no-store"); // liveness must never be cached
     const lastPolled = await repository.getMeta(META_LAST_POLLED);
     const now = Date.now();
     const staleAfterMs = config.healthStaleAfterMin * 60_000;

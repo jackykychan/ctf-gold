@@ -10,6 +10,14 @@ export interface PriceRepository {
   insertIfNew(code: number, price: number, updateDate: string, fetchedAt: string): Promise<boolean>;
   /** Full history for a series, ascending by update time. */
   historyForCode(code: number): Promise<RawPoint[]>;
+  /**
+   * Bounded read for a range window: rows with `update_date >= since` (ascending)
+   * plus the single row immediately before `since` (for a correct first-point
+   * delta). Reads O(window), not O(all history).
+   */
+  historyWindow(code: number, since: string): Promise<{ preceding: RawPoint | null; rows: RawPoint[] }>;
+  /** Newest row strictly before `boundary` (e.g. the previous day's close). */
+  latestBeforeDay(code: number, boundary: string): Promise<RawPoint | null>;
   /** Newest point for a series, or null. */
   latest(code: number): Promise<RawPoint | null>;
   /** Newest updateDate for a series, or null. */
