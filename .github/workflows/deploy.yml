@@ -3,6 +3,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # Manual "Run workflow" button in the Actions tab — deploy any branch on demand,
+  # no merge required.
+  workflow_dispatch:
 
 # One deploy at a time; let a newer push supersede an in-flight one.
 concurrency:
