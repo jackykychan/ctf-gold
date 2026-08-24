@@ -54,7 +54,9 @@ export function BackToTop({ locale }: BackToTopProps) {
       onClick={onClick}
       aria-label={t(locale, "cards.backToTop")}
       className={cn(
-        "fixed bottom-6 right-6 z-50 rounded-full shadow-md transition-opacity duration-200 lg:hidden",
+        // bottom-16 (not bottom-6): keep the whole button above iOS Safari's
+        // bottom-edge hot-zone, which otherwise reveals the toolbar on first tap.
+        "fixed bottom-16 right-6 z-50 rounded-full shadow-md transition-opacity duration-200 lg:hidden",
         atTop
           ? "pointer-events-none opacity-0"
           : scrolling
