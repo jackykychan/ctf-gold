@@ -1,6 +1,6 @@
 import { PRICE_SERIES } from "../config";
 import { computeChangePct, filterRange, previousDayChangePct } from "../domain/changes";
-import type { PriceRepository } from "../data/priceRepository";
+import type { PriceRepository } from "../data/repository";
 import type {
   HistoryResponse,
   LatestEntry,
@@ -11,8 +11,8 @@ import type {
 } from "../shared/types";
 
 export interface HistoryService {
-  getHistory(range: Range, now?: Date): HistoryResponse;
-  getLatest(): LatestResponse;
+  getHistory(range: Range, now?: Date): Promise<HistoryResponse>;
+  getLatest(): Promise<LatestResponse>;
 }
 
 function emptySeriesMap<T>(make: () => T): Record<SeriesKey, T> {
@@ -23,19 +23,19 @@ function emptySeriesMap<T>(make: () => T): Record<SeriesKey, T> {
 
 export function createHistoryService(repo: PriceRepository): HistoryService {
   return {
-    getHistory(range, now = new Date()): HistoryResponse {
+    async getHistory(range, now = new Date()): Promise<HistoryResponse> {
       const series = emptySeriesMap<PricePoint[]>(() => []);
       for (const s of PRICE_SERIES) {
-        const full = computeChangePct(repo.historyForCode(s.code));
+        const full = computeChangePct(await repo.historyForCode(s.code));
         series[s.key] = filterRange(full, range, now);
       }
       return { range, generatedAt: now.toISOString(), series };
     },
 
-    getLatest(): LatestResponse {
+    async getLatest(): Promise<LatestResponse> {
       const latest = emptySeriesMap<LatestEntry | null>(() => null);
       for (const s of PRICE_SERIES) {
-        const rows = repo.historyForCode(s.code);
+        const rows = await repo.historyForCode(s.code);
         const row = rows[rows.length - 1];
         latest[s.key] = row
           ? {

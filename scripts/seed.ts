@@ -50,8 +50,8 @@ for (let day = DAYS; day >= 0; day--) {
     const buyDate = fmt(new Date(ts.getTime() + 30)); // ~same second, different ms
     const fetchedAt = ts.toISOString();
 
-    if (repo.insertIfNew(seriesByKey("sell").code, sell, sellDate, fetchedAt)) inserted++;
-    if (repo.insertIfNew(seriesByKey("buy").code, buy, buyDate, fetchedAt)) inserted++;
+    if (await repo.insertIfNew(seriesByKey("sell").code, sell, sellDate, fetchedAt)) inserted++;
+    if (await repo.insertIfNew(seriesByKey("buy").code, buy, buyDate, fetchedAt)) inserted++;
   }
 }
 

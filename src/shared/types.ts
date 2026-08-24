@@ -3,6 +3,9 @@
  * A change here is caught by the compiler on both sides of the wire.
  */
 
+/** meta-table key recording the last time the poller/cron ran (for /api/health liveness). */
+export const META_LAST_POLLED = "last_polled_at";
+
 export type SeriesKey = "sell" | "buy";
 
 export type Range = "5d" | "2w" | "1m" | "3m" | "6m";
