@@ -16,6 +16,48 @@ function toXY(points: readonly { t: string; price: number }[]): { x: number; y: 
   return points.map((p) => ({ x: parseApiDate(p.t).getTime(), y: p.price }));
 }
 
+// Total time for the initial left-to-right line draw.
+const DRAW_MS = 900;
+
+/**
+ * Chart.js "progressive line" animation: each point — and the segment reaching
+ * it — appears in index order (left to right) over DRAW_MS. Used only for the
+ * first render; later updates use a plain, quick transition.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function progressiveDrawAnimation(): any {
+  const per = (ctx: any) =>
+    DRAW_MS / Math.max((ctx.chart.data.datasets[ctx.datasetIndex]?.data.length ?? 1) - 1, 1);
+  const previousY = (ctx: any) =>
+    ctx.index === 0
+      ? ctx.chart.scales.y.getPixelForValue(ctx.chart.scales.y.min)
+      : ctx.chart.getDatasetMeta(ctx.datasetIndex).data[ctx.index - 1].getProps(["y"], true).y;
+  return {
+    x: {
+      type: "number",
+      easing: "linear",
+      duration: per,
+      from: NaN, // point is skipped until its turn
+      delay(ctx: any) {
+        if (ctx.type !== "data" || ctx.xStarted) return 0;
+        ctx.xStarted = true;
+        return ctx.index * per(ctx);
+      },
+    },
+    y: {
+      type: "number",
+      easing: "linear",
+      duration: per,
+      from: previousY,
+      delay(ctx: any) {
+        if (ctx.type !== "data" || ctx.yStarted) return 0;
+        ctx.yStarted = true;
+        return ctx.index * per(ctx);
+      },
+    },
+  };
+}
+
 export function createPriceChart(canvas: HTMLCanvasElement): Chart {
   return new Chart(canvas, {
     type: "line",
@@ -94,6 +136,18 @@ export function updateChart(
   };
   const legend = chart.options.plugins!.legend!;
   legend.labels = { ...legend.labels, color: textColor };
+
+  // Draw left-to-right on the first render only; keep later refreshes/toggles
+  // to a quick, plain transition so the line doesn't re-draw every 60s.
+  const c = chart as Chart & { __drawn?: boolean };
+  if (!c.__drawn) {
+    c.__drawn = true;
+    chart.options.animations = progressiveDrawAnimation();
+    chart.options.animation = { duration: DRAW_MS };
+  } else {
+    chart.options.animations = {};
+    chart.options.animation = { duration: 300 };
+  }
 
   chart.update();
 }
