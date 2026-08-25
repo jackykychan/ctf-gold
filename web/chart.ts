@@ -5,6 +5,7 @@ import { parseApiDate } from "../src/shared/time";
 import { dailyHigh } from "../src/domain/changes";
 import type { HistoryResponse } from "../src/shared/types";
 import { intlLocale, t, type Locale } from "./i18n";
+import { DRAW_MS, clipWidth, drawProgress } from "./chartAnim";
 
 export type ViewMode = "both" | "sell" | "buy";
 
@@ -15,9 +16,6 @@ function cssVar(name: string): string {
 function toXY(points: readonly { t: string; price: number }[]): { x: number; y: number }[] {
   return points.map((p) => ({ x: parseApiDate(p.t).getTime(), y: p.price }));
 }
-
-// Duration of the left-to-right line-draw reveal.
-const DRAW_MS = 900;
 
 type DrawState = { clip?: number; raf?: number };
 const drawStateOf = (chart: Chart): DrawState => chart as Chart & DrawState;
@@ -33,7 +31,7 @@ const drawClipPlugin = {
     const { ctx, chartArea } = chart;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(chartArea.left, chartArea.top, (chartArea.right - chartArea.left) * p, chartArea.bottom - chartArea.top);
+    ctx.rect(chartArea.left, chartArea.top, clipWidth(chartArea.left, chartArea.right, p), chartArea.bottom - chartArea.top);
     ctx.clip();
   },
   afterDatasetsDraw(chart: Chart) {
@@ -43,18 +41,16 @@ const drawClipPlugin = {
   },
 };
 
-const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
-
 // Animate the clip from 0 → 1 over DRAW_MS, redrawing each frame.
 function playDrawReveal(chart: Chart): void {
   const state = drawStateOf(chart);
   if (state.raf) cancelAnimationFrame(state.raf);
   const start = performance.now();
   const tick = (now: number) => {
-    const progress = Math.min((now - start) / DRAW_MS, 1);
-    state.clip = easeOutCubic(progress);
+    const elapsed = now - start;
+    state.clip = drawProgress(elapsed);
     chart.draw();
-    state.raf = progress < 1 ? requestAnimationFrame(tick) : undefined;
+    state.raf = elapsed < DRAW_MS ? requestAnimationFrame(tick) : undefined;
   };
   state.raf = requestAnimationFrame(tick);
 }

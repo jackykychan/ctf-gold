@@ -34,3 +34,22 @@ test("every translation key exists in both dictionaries", () => {
     }
   }
 });
+
+test("English range labels use the full 'Last N …' wording", () => {
+  assert.equal(STRINGS.en["range.5d"], "Last 5 Days");
+  assert.equal(STRINGS.en["range.2w"], "Last 2 Weeks");
+  assert.equal(STRINGS.en["range.1m"], "Last 1 Month");
+  assert.equal(STRINGS.en["range.3m"], "Last 3 Months");
+  assert.equal(STRINGS.en["range.6m"], "Last 6 Months");
+});
+
+test("relabelled controls: series 'All' and capitalised 'Daily High'", () => {
+  assert.equal(STRINGS.en["view.both"], "All");
+  assert.equal(STRINGS["zh-Hant"]["view.both"], "全部");
+  assert.equal(STRINGS.en["cards.daily"], "Daily High");
+});
+
+test("source link label is present in both locales", () => {
+  assert.ok(STRINGS.en["source.link"]);
+  assert.ok(STRINGS["zh-Hant"]["source.link"]);
+});
