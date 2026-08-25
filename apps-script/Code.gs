@@ -97,15 +97,25 @@ function syncDailyHighToSheet() {
   });
   if (res.getResponseCode() !== 200) throw new Error("daily-high -> " + res.getResponseCode());
   var data = JSON.parse(res.getContentText()); // { sell:[{date,price}], buy:[{date,price}] }
-  upsertBlock_(sh, SELL, data.sell || [], true);
-  upsertBlock_(sh, BUY, data.buy || [], false);
+  var s = upsertBlock_(sh, SELL, data.sell || [], true);
+  var b = upsertBlock_(sh, BUY, data.buy || [], false);
+  Logger.log(
+    "Write-back done: sell(updated=%s appended=%s unchanged=%s) buy(updated=%s appended=%s unchanged=%s)",
+    s.updated, s.appended, s.unchanged, b.updated, b.appended, b.unchanged
+  );
 }
 
-/** Upsert {date,price} items into a block: overwrite existing date rows, append new ones. */
+/**
+ * Upsert {date,price} items into a block: append new dates, and overwrite an
+ * existing date's price ONLY when it actually changed. Skipping equal-value
+ * writes avoids polluting the Sheet's edit history with no-op changes on every
+ * run (the daily high is unchanged most of the time).
+ */
 function upsertBlock_(sh, col, items, hasWeekday) {
-  if (items.length === 0) return;
+  if (items.length === 0) return { updated: 0, appended: 0, unchanged: 0 };
   var last = Math.max(sh.getLastRow(), 1);
   var dates = sh.getRange(1, col.date, last, 1).getValues();
+  var prices = sh.getRange(1, col.price, last, 1).getValues();
   var index = {},
     lastDataRow = 0;
   for (var i = 0; i < last; i++) {
@@ -116,10 +126,19 @@ function upsertBlock_(sh, col, items, hasWeekday) {
     }
   }
   var nextRow = lastDataRow + 1;
+  var updated = 0,
+    appended = 0,
+    unchanged = 0;
   items.forEach(function (it) {
     var row = index[it.date];
     if (row) {
+      // Compare numerically so 44975 vs "44,975.00" counts as unchanged.
+      if (toNumber_(prices[row - 1][0]) === it.price) {
+        unchanged++;
+        return;
+      }
       sh.getRange(row, col.price).setValue(it.price);
+      updated++;
       return;
     }
     var p = it.date.split("-");
@@ -131,7 +150,9 @@ function upsertBlock_(sh, col, items, hasWeekday) {
     sh.getRange(nextRow, col.price).setValue(it.price);
     index[it.date] = nextRow;
     nextRow++;
+    appended++;
   });
+  return { updated: updated, appended: appended, unchanged: unchanged };
 }
 
 function postJson_(path, body) {
