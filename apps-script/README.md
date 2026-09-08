@@ -28,5 +28,7 @@ Bridges the manually-maintained **Gold Price** sheet with the live site.
 ## Notes
 
 - Only `/api/import` (write) needs the secret; `/api/daily-high` is a public read.
-- Adjust `TAB`, `SELL`, `BUY` at the top of `Code.gs` if columns change.
+- Columns are found by header text (`日期` ×2, `賣出(港幣)`, `買入(港幣)`), so they
+  can move; the weekday is the column right of the sell `日期`. Only `TAB` (the
+  sheet-tab name) is hard-coded at the top of `Code.gs`.
 - Re-running the import is safe — rows dedupe on `(code, date)`.

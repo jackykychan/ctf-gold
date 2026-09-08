@@ -9,14 +9,70 @@
  *   3. Run importFromSheet() once (authorise when prompted).
  *   4. Triggers → add a time-driven trigger on syncDailyHighToSheet() (e.g. hourly).
  *
- * Sheet layout — tab "Gold Price":
- *   Sell block: B=date (D/M/YYYY), C=weekday, D=賣出(港幣)
- *   Buy  block: L=date (D/M/YYYY),            M=買入(港幣)
+ * Sheet layout — tab "Gold Price": columns are located by their header text
+ * (not hard-coded), scanning the top rows for the header row:
+ *   - "日期" (appears twice)          → the sell and buy date columns
+ *   - the column right of the sell 日期 → weekday
+ *   - "賣出(港幣)"                     → sell price
+ *   - "買入(港幣)"                     → buy price
+ * Each 日期 pairs with the price header in its block (the nearest 日期 to the
+ * left of that price column); the sell (left) 日期 owns the weekday column.
  */
 
 var TAB = "Gold Price";
-var SELL = { date: 2, weekday: 3, price: 4 }; // B, C, D
-var BUY = { date: 12, price: 13 }; // L, M
+
+/**
+ * Locate the header row — the first row (within the top rows) that contains a
+ * "日期" cell — and return its 0-based cell array. Tolerates a title row above.
+ */
+function headerRow_(sh) {
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var scan = Math.min(Math.max(sh.getLastRow(), 1), 10);
+  var grid = sh.getRange(1, 1, scan, lastCol).getValues();
+  for (var r = 0; r < scan; r++) {
+    for (var c = 0; c < lastCol; c++) {
+      if (String(grid[r][c]).indexOf("日期") !== -1) return grid[r];
+    }
+  }
+  throw new Error('No "日期" header found in the first ' + scan + ' rows of "' + TAB + '"');
+}
+
+/**
+ * Resolve sell/buy column numbers (1-based) from the header row by matching the
+ * header text: "日期" (date), "賣出" (sell price), "買入" (buy price). Each date
+ * pairs with the nearest 日期 to the left of its block's price header; the sell
+ * date's right-hand neighbour is the weekday column.
+ * Returns { sell: {date, weekday, price}, buy: {date, price} }.
+ */
+function resolveColumns_(sh) {
+  var hdr = headerRow_(sh);
+  var dateCols = [],
+    sellPrice = 0,
+    buyPrice = 0;
+  for (var c = 0; c < hdr.length; c++) {
+    var v = String(hdr[c]).replace(/\s+/g, "");
+    if (v.indexOf("日期") !== -1) dateCols.push(c + 1);
+    if (v.indexOf("賣出") !== -1) sellPrice = c + 1;
+    if (v.indexOf("買入") !== -1) buyPrice = c + 1;
+  }
+  if (!dateCols.length) throw new Error('Header "日期" not found');
+  if (!sellPrice) throw new Error('Header "賣出(港幣)" not found');
+  if (!buyPrice) throw new Error('Header "買入(港幣)" not found');
+
+  function dateForPrice(priceCol) {
+    var best = 0;
+    for (var i = 0; i < dateCols.length; i++) {
+      if (dateCols[i] < priceCol && dateCols[i] > best) best = dateCols[i];
+    }
+    return best || dateCols[0];
+  }
+  var sellDate = dateForPrice(sellPrice);
+  var buyDate = dateForPrice(buyPrice);
+  return {
+    sell: { date: sellDate, weekday: sellDate + 1, price: sellPrice },
+    buy: { date: buyDate, price: buyPrice },
+  };
+}
 
 function props_() {
   return PropertiesService.getScriptProperties();
@@ -60,12 +116,13 @@ function toNumber_(v) {
 /** ── One-time import: Sheet → site ─────────────────────────────────────── */
 function importFromSheet() {
   var sh = sheet_();
+  var cols = resolveColumns_(sh);
   var last = Math.max(sh.getLastRow(), 1);
   var points = [];
 
   [
-    { code: 6, col: SELL },
-    { code: 8, col: BUY },
+    { code: 6, col: cols.sell },
+    { code: 8, col: cols.buy },
   ].forEach(function (blk) {
     var dates = sh.getRange(1, blk.col.date, last, 1).getValues();
     var prices = sh.getRange(1, blk.col.price, last, 1).getValues();
@@ -91,14 +148,15 @@ function importFromSheet() {
 /** ── Recurring write-back: site daily-high → Sheet ─────────────────────── */
 function syncDailyHighToSheet() {
   var sh = sheet_();
+  var cols = resolveColumns_(sh);
   var since = Utilities.formatDate(new Date(Date.now() - 3 * 86400000), tz_(), "yyyy-MM-dd");
   var res = UrlFetchApp.fetch(siteUrl_() + "/api/daily-high?since=" + since, {
     muteHttpExceptions: true,
   });
   if (res.getResponseCode() !== 200) throw new Error("daily-high -> " + res.getResponseCode());
   var data = JSON.parse(res.getContentText()); // { sell:[{date,price}], buy:[{date,price}] }
-  var s = upsertBlock_(sh, SELL, data.sell || [], true);
-  var b = upsertBlock_(sh, BUY, data.buy || [], false);
+  var s = upsertBlock_(sh, cols.sell, data.sell || [], true);
+  var b = upsertBlock_(sh, cols.buy, data.buy || [], false);
   Logger.log(
     "Write-back done: sell(updated=%s appended=%s unchanged=%s) buy(updated=%s appended=%s unchanged=%s)",
     s.updated, s.appended, s.unchanged, b.updated, b.appended, b.unchanged
