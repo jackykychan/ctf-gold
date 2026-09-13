@@ -1,9 +1,17 @@
 import type { RawPoint } from "../src/domain/changes";
 import type { PriceRepository } from "../src/data/repository";
+import type { AlertPrefs, StoredSubscription } from "../src/shared/push";
 
 interface Row {
   update_date: string;
   origin_price: number;
+}
+
+interface SubRow {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  prefs: string;
 }
 
 /** Newest row strictly before `boundary`, or null. */
@@ -102,6 +110,34 @@ export function createD1Repository(db: D1Database): PriceRepository {
         )
         .bind(key, value)
         .run();
+    },
+    async upsertSubscription(endpoint, p256dh, auth, prefs, now) {
+      await db
+        .prepare(
+          `INSERT INTO push_subscriptions (endpoint, p256dh, auth, prefs, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(endpoint) DO UPDATE SET
+             p256dh = excluded.p256dh, auth = excluded.auth,
+             prefs = excluded.prefs, updated_at = excluded.updated_at`,
+        )
+        .bind(endpoint, p256dh, auth, JSON.stringify(prefs), now, now)
+        .run();
+    },
+    async deleteSubscription(endpoint) {
+      await db.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`).bind(endpoint).run();
+    },
+    async listSubscriptions() {
+      const res = await db
+        .prepare(`SELECT endpoint, p256dh, auth, prefs FROM push_subscriptions`)
+        .all<SubRow>();
+      return res.results.map(
+        (r): StoredSubscription => ({
+          endpoint: r.endpoint,
+          p256dh: r.p256dh,
+          auth: r.auth,
+          prefs: JSON.parse(r.prefs) as AlertPrefs,
+        }),
+      );
     },
   };
 }

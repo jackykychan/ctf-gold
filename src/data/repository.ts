@@ -1,4 +1,5 @@
 import type { RawPoint } from "../domain/changes";
+import type { AlertPrefs, StoredSubscription } from "../shared/push";
 
 /**
  * The data-access contract for price history + small meta records. Dependency-
@@ -31,4 +32,17 @@ export interface PriceRepository {
   getMeta(key: string): Promise<string | null>;
   /** Upsert a small key/value meta record. */
   setMeta(key: string, value: string): Promise<void>;
+
+  /** Insert or update a push subscription (keyed by endpoint) with its prefs. */
+  upsertSubscription(
+    endpoint: string,
+    p256dh: string,
+    auth: string,
+    prefs: AlertPrefs,
+    now: string,
+  ): Promise<void>;
+  /** Remove a push subscription (e.g. on unsubscribe or when the push service reports it gone). */
+  deleteSubscription(endpoint: string): Promise<void>;
+  /** All push subscriptions, for the cron fan-out. */
+  listSubscriptions(): Promise<StoredSubscription[]>;
 }
