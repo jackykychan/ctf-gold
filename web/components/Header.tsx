@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { t, type Locale, LOCALES } from "@/i18n";
 import { THEME_CHOICES, type ThemeChoice } from "@/theme";
 import { Marquee } from "@/components/Marquee";
+import { NotificationsButton } from "@/components/NotificationsButton";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
 const THEME_ICON: Record<ThemeChoice, ReactNode> = {
@@ -48,6 +49,9 @@ export function Header({ locale, themeChoice, onThemeChange, onLocaleChange }: H
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {/* Web Push notifications: bell opens the alert-settings dialog. */}
+        <NotificationsButton locale={locale} />
+
         {/* Theme: trigger shows only the selected theme's icon; the open list
             shows each theme's icon + full label. */}
         <Select value={themeChoice} onValueChange={(v) => onThemeChange(v as ThemeChoice)}>

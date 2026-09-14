@@ -95,3 +95,26 @@ test("meta get/set round-trips and upserts", async () => {
   await repo.setMeta("last_polled_at", "2026-08-23T01:00:00Z");
   assert.equal(await repo.getMeta("last_polled_at"), "2026-08-23T01:00:00Z");
 });
+
+test("push subscriptions upsert/list/delete round-trip", async () => {
+  const repo = createRepository(createDb(":memory:"));
+  assert.deepEqual(await repo.listSubscriptions(), []);
+
+  const prefs = { everyUpdate: true, dailyHigh: false, upTarget: 53000, downTarget: null, series: "sell" as const, locale: "en" as const };
+  await repo.upsertSubscription("https://p/e1", "P1", "A1", prefs, "2026-09-12T00:00:00Z");
+  const subs = await repo.listSubscriptions();
+  assert.equal(subs.length, 1);
+  assert.equal(subs[0]!.endpoint, "https://p/e1");
+  assert.deepEqual(subs[0]!.prefs, prefs);
+
+  // Upsert on the same endpoint updates prefs, not a second row.
+  const prefs2 = { ...prefs, series: "both" as const, everyUpdate: false, dailyHigh: true };
+  await repo.upsertSubscription("https://p/e1", "P1b", "A1b", prefs2, "2026-09-12T01:00:00Z");
+  const after = await repo.listSubscriptions();
+  assert.equal(after.length, 1);
+  assert.equal(after[0]!.p256dh, "P1b");
+  assert.deepEqual(after[0]!.prefs, prefs2);
+
+  await repo.deleteSubscription("https://p/e1");
+  assert.deepEqual(await repo.listSubscriptions(), []);
+});

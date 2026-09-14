@@ -13,6 +13,7 @@ visitor — so the history is shared and persistent.
 - **Stacked change-cards**, newest on top: price, timestamp, and % change vs the previous point.
 - **Adaptive polling** that catches intraday updates without hammering the API.
 - **Light / dark theme** (defaults to system) and **English / Traditional Chinese** (defaults to browser language), with **Lucide** icons in the shadcn/ui pickers.
+- **Web Push price alerts** (opt-in): every update, new daily high, or crossing a rise-to / drop-to target price, per Sell / Buy / Both — evaluated by the cron Worker and delivered even when the site is closed. See [Notifications](#notifications-web-push).
 - Written in **TypeScript** end-to-end; modular and unit-tested.
 
 ## Stack
@@ -51,6 +52,8 @@ npm run dev:worker        # builds the frontend, then `wrangler dev` -> http://l
 | `npm run typecheck` | Type-check backend, frontend, and Worker (three tsconfigs). |
 | `npm test` | Run the unit/route tests (`node --test` via tsx). |
 | `npm run seed` | Insert synthetic 6-month history into the local SQLite (dev only). |
+| `npm run gen:vapid` | Print a fresh VAPID keypair for Web Push (see [Notifications](#notifications-web-push)). |
+| `npm run gen:icons` | Regenerate the PWA icons in `public/` (no image dependency). |
 | `npm run deploy` | Build the frontend and `wrangler deploy` the Worker. |
 | `npm run cf:db:create` | `wrangler d1 create ctf-gold` (one-time). |
 | `npm run cf:migrate` / `:local` | Apply D1 migrations to the remote / local database. |
@@ -101,6 +104,33 @@ Local dev reads `process.env`; the Worker reads `vars` in `wrangler.jsonc`.
 | `HEALTH_STALE_AFTER_MIN` | `30` | `/api/health` reports degraded past this poll age. |
 | `START/MIN/MAX_POLL_INTERVAL_MIN` | `15/5/120` | Local adaptive poller bounds (Node only). |
 | `SYNC_SECRET` | _(unset)_ | Bearer secret gating `POST /api/import`; empty disables it. Set via `wrangler secret put SYNC_SECRET`. |
+| `VAPID_PUBLIC_KEY` | _(unset)_ | Web Push application-server public key (base64url). Empty disables push. Public `var`. |
+| `VAPID_PRIVATE_KEY` | _(unset)_ | Web Push private key. Set via `wrangler secret put VAPID_PRIVATE_KEY`. |
+| `VAPID_CONTACT` | `mailto:admin@example.com` | Contact in the VAPID JWT `sub` claim. Public `var`. |
+
+## Notifications (Web Push)
+
+Opt-in browser notifications for price changes. Preferences (alert types, targets,
+series, language) are stored server-side per push subscription; the cron Worker
+evaluates each new price against every subscription and sends the matching pushes,
+so alerts arrive even when the site is closed. Threshold alerts are **crossing-based**
+(fire once as the price crosses a target, not repeatedly while past it).
+
+**Setup**
+
+1. Generate a VAPID keypair: `npm run gen:vapid`.
+2. Put the public key in `wrangler.jsonc` → `vars.VAPID_PUBLIC_KEY`; set `VAPID_CONTACT`.
+3. `wrangler secret put VAPID_PRIVATE_KEY` (paste the private key).
+4. Deploy (applies migration `0004`), or run migrations: `npm run cf:migrate`.
+5. Local dev: put `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_CONTACT` in `.dev.vars`.
+
+**iOS:** Safari only delivers Web Push from an **installed PWA** — add the site to the
+Home Screen and open it from there. Desktop Chrome/Firefox/Safari and Android Chrome
+work in a normal tab. The bell dialog shows a hint on iOS Safari when not installed.
+
+Endpoints: `POST /api/push/subscribe` · `POST /api/push/unsubscribe` · `GET /api/push/public-key`
+(all no-store; subscribe returns `503` when VAPID is unset). Client: `web/push.ts` +
+`public/sw.js`; sender: `worker/webPush.ts` (self-contained VAPID + aes128gcm WebCrypto).
 
 ## Google Sheet sync
 

@@ -29,6 +29,13 @@
 
   "vars": {
     "API_URL": "https://www.chowtaifook.com/bin/servlet/ctfweb/goldPrice?region=HK",
-    "HEALTH_STALE_AFTER_MIN": "30"
+    "HEALTH_STALE_AFTER_MIN": "30",
+
+    // Web Push (VAPID). Generate a keypair with `npm run gen:vapid`, then paste
+    // the public key here and set the private key as a secret:
+    //   wrangler secret put VAPID_PRIVATE_KEY
+    // Empty VAPID_PUBLIC_KEY leaves push disabled (subscribe returns 503).
+    "VAPID_PUBLIC_KEY": "BALr99IXb_O8H42GTbuSJLN1zVJ_815u4z3J-udDmSjhgY-FC34Dy4aFmWk8sKkgrezCsKe2voI7dnulR9Q42ig",
+    "VAPID_CONTACT": "mailto:someunusualactivity@gmail.com"
   }
 }

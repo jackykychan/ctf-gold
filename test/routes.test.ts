@@ -125,6 +125,53 @@ test("GET /api/daily-high returns per-day maxima since a date", async () => {
   assert.deepEqual(body.buy, []);
 });
 
+function routerWithVapid(repo: ReturnType<typeof createRepository>) {
+  return createApiRouter({
+    service: createHistoryService(repo),
+    repository: repo,
+    config: loadConfig({ VAPID_PUBLIC_KEY: "PUBKEY", VAPID_PRIVATE_KEY: "PRIVKEY" }),
+  });
+}
+
+test("GET /api/push/public-key returns the configured VAPID key", async () => {
+  const body = (await (await routerWithVapid(createRepository(createDb(":memory:")))
+    .request("/api/push/public-key")).json()) as any;
+  assert.equal(body.key, "PUBKEY");
+});
+
+test("POST /api/push/subscribe stores a subscription; unsubscribe removes it", async () => {
+  const repo = createRepository(createDb(":memory:"));
+  const app = routerWithVapid(repo);
+  const sub = {
+    subscription: { endpoint: "https://push.example.com/xyz", keys: { p256dh: "P", auth: "A" } },
+    prefs: { everyUpdate: true, series: "sell" },
+  };
+  const post = (path: string, body: unknown) =>
+    app.request(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  const ok = await post("/api/push/subscribe", sub);
+  assert.equal(ok.status, 200);
+  assert.equal((await repo.listSubscriptions()).length, 1);
+
+  const gone = await post("/api/push/unsubscribe", { endpoint: sub.subscription.endpoint });
+  assert.equal(gone.status, 200);
+  assert.equal((await repo.listSubscriptions()).length, 0);
+});
+
+test("POST /api/push/subscribe returns 503 when VAPID is unset", async () => {
+  const app = routerFor(createRepository(createDb(":memory:"))); // default config: no VAPID
+  const res = await app.request("/api/push/subscribe", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ subscription: { endpoint: "https://p/x", keys: { p256dh: "P", auth: "A" } } }),
+  });
+  assert.equal(res.status, 503);
+});
+
 test("GET /api/health: starting -> ok -> degraded by poll liveness", async () => {
   const repo = createRepository(createDb(":memory:"));
   const app = routerFor(repo);

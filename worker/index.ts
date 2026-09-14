@@ -3,8 +3,10 @@ import { CANONICAL_SERIES_KEY, loadConfig, seriesByKey, type EnvSource } from ".
 import { createHistoryService } from "../src/services/historyService";
 import { createApiRouter } from "../src/http/api";
 import { runPollOnce } from "../src/pollCore";
+import { evaluateAlerts } from "../src/domain/pushAlerts";
 import { META_LAST_POLLED } from "../src/shared/types";
 import { createD1Repository } from "./d1Repository";
+import { sendPush } from "./webPush";
 
 export interface Env {
   DB: D1Database;
@@ -16,6 +18,9 @@ export interface Env {
   MIN_POLL_INTERVAL_MIN?: string;
   MAX_POLL_INTERVAL_MIN?: string;
   SYNC_SECRET?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_CONTACT?: string;
 }
 
 function deps(env: Env) {
@@ -60,17 +65,20 @@ export default {
     return assetRes;
   },
 
-  async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const { repository, config } = deps(env);
     const client = createGoldPriceClient(config.apiUrl);
     const canonicalCode = seriesByKey(CANONICAL_SERIES_KEY).code;
     try {
-      const { inserted, canonicalUpdateDate } = await runPollOnce({
+      const { inserted, canonicalUpdateDate, insertedPoints } = await runPollOnce({
         client,
         repository,
         canonicalCode,
       });
       console.log(`Poll ok: ${inserted} new point(s) @ ${canonicalUpdateDate}`);
+      if (insertedPoints.length > 0 && config.vapidPublicKey && config.vapidPrivateKey) {
+        await fanOutPush(repository, config, insertedPoints, ctx);
+      }
     } catch (err) {
       console.error(`Poll failed: ${(err as Error).message}`);
     } finally {
@@ -80,3 +88,50 @@ export default {
     }
   },
 };
+
+/**
+ * Evaluate each newly-inserted point against every subscription's prefs and
+ * send the matching Web Pushes. Runs under ctx.waitUntil so the cron returns
+ * promptly; prunes subscriptions the push service reports as gone (404/410).
+ */
+async function fanOutPush(
+  repository: ReturnType<typeof createD1Repository>,
+  config: ReturnType<typeof loadConfig>,
+  insertedPoints: Awaited<ReturnType<typeof runPollOnce>>["insertedPoints"],
+  ctx: ExecutionContext,
+): Promise<void> {
+  const subs = await repository.listSubscriptions();
+  if (subs.length === 0) return;
+
+  const sends: Promise<void>[] = [];
+  for (const pt of insertedPoints) {
+    // A new daily high = strictly above the max of earlier points on the same
+    // day (first point of the day counts as a new high).
+    const dayStart = `${pt.updateDate.slice(0, 10)} 00:00:00`;
+    const { rows } = await repository.historyWindow(pt.code, dayStart);
+    const earlierMax = rows
+      .filter((r) => r.updateDate < pt.updateDate)
+      .reduce((m, r) => Math.max(m, r.price), 0);
+    const isDailyHigh = pt.price > earlierMax;
+
+    const event = {
+      series: pt.key,
+      price: pt.price,
+      prevPrice: pt.prevPrice,
+      isDailyHigh,
+      updateDate: pt.updateDate,
+    };
+    for (const sub of subs) {
+      const payload = evaluateAlerts(sub.prefs, event);
+      if (!payload) continue;
+      sends.push(
+        sendPush(sub, payload, config)
+          .then(async (status) => {
+            if (status === 404 || status === 410) await repository.deleteSubscription(sub.endpoint);
+          })
+          .catch((err) => console.error(`Push failed: ${(err as Error).message}`)),
+      );
+    }
+  }
+  ctx.waitUntil(Promise.all(sends));
+}

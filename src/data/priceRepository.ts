@@ -1,7 +1,18 @@
 import type { DB } from "./db";
 import type { PriceRepository } from "./repository";
+import type { AlertPrefs, StoredSubscription } from "../shared/push";
 
 export type { PriceRepository };
+
+interface SubRow {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  prefs: string;
+}
+function toStoredSub(r: SubRow): StoredSubscription {
+  return { endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, prefs: JSON.parse(r.prefs) as AlertPrefs };
+}
 
 interface Row {
   update_date: string;
@@ -39,6 +50,15 @@ export function createRepository(db: DB): PriceRepository {
     `INSERT INTO meta (key, value) VALUES (?, ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
   );
+  const upsertSubStmt = db.prepare(
+    `INSERT INTO push_subscriptions (endpoint, p256dh, auth, prefs, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET
+       p256dh = excluded.p256dh, auth = excluded.auth,
+       prefs = excluded.prefs, updated_at = excluded.updated_at`,
+  );
+  const deleteSubStmt = db.prepare(`DELETE FROM push_subscriptions WHERE endpoint = ?`);
+  const listSubsStmt = db.prepare(`SELECT endpoint, p256dh, auth, prefs FROM push_subscriptions`);
 
   return {
     async insertIfNew(code, price, updateDate, fetchedAt) {
@@ -89,6 +109,15 @@ export function createRepository(db: DB): PriceRepository {
     },
     async setMeta(key, value) {
       setMetaStmt.run(key, value);
+    },
+    async upsertSubscription(endpoint, p256dh, auth, prefs, now) {
+      upsertSubStmt.run(endpoint, p256dh, auth, JSON.stringify(prefs), now, now);
+    },
+    async deleteSubscription(endpoint) {
+      deleteSubStmt.run(endpoint);
+    },
+    async listSubscriptions() {
+      return (listSubsStmt.all() as SubRow[]).map(toStoredSub);
     },
   };
 }

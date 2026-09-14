@@ -3,6 +3,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { PRICE_SERIES, type AppConfig } from "../config";
 import { dailyHigh } from "../domain/changes";
 import { toImportPoints } from "../domain/importPoints";
+import { toPushSubscription } from "../domain/pushSubscription";
 import type { PriceRepository } from "../data/repository";
 import type { HistoryService } from "../services/historyService";
 import { META_LAST_POLLED, RANGES, type Range, type SeriesKey } from "../shared/types";
@@ -80,6 +81,50 @@ export function createApiRouter({ service, repository, config }: ApiDeps): Hono 
       "manual",
     );
     return c.json({ received: points.length, inserted, skipped });
+  });
+
+  // ── Web Push ────────────────────────────────────────────────────────────
+  // VAPID public key so the client can subscribe. Empty key ⇒ push disabled.
+  api.get("/api/push/public-key", (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ key: config.vapidPublicKey });
+  });
+
+  // Subscribe / update prefs (keyed by endpoint). Public, but the body is
+  // validated by a pure mapper; 503 when push isn't configured server-side.
+  api.post("/api/push/subscribe", async (c) => {
+    if (!config.vapidPublicKey || !config.vapidPrivateKey) {
+      return c.json({ error: "push not configured" }, 503);
+    }
+    let sub;
+    try {
+      sub = toPushSubscription(await c.req.json());
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 400);
+    }
+    await repository.upsertSubscription(
+      sub.endpoint,
+      sub.p256dh,
+      sub.auth,
+      sub.prefs,
+      new Date().toISOString(),
+    );
+    return c.json({ ok: true });
+  });
+
+  // Unsubscribe by endpoint.
+  api.post("/api/push/unsubscribe", async (c) => {
+    let endpoint: unknown;
+    try {
+      endpoint = (await c.req.json())?.endpoint;
+    } catch {
+      return c.json({ error: "invalid body" }, 400);
+    }
+    if (typeof endpoint !== "string" || !endpoint) {
+      return c.json({ error: "endpoint is required" }, 400);
+    }
+    await repository.deleteSubscription(endpoint);
+    return c.json({ ok: true });
   });
 
   // Liveness: degraded (503) when the poller/cron hasn't recorded a run recently,

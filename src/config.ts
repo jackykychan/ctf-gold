@@ -40,6 +40,12 @@ export interface AppConfig {
   healthStaleAfterMin: number;
   /** Bearer secret required to write via /api/import; empty disables the endpoint. */
   syncSecret: string;
+  /** VAPID application-server public key (base64url); empty disables Web Push. */
+  vapidPublicKey: string;
+  /** VAPID application-server private key (base64url d); empty disables Web Push. */
+  vapidPrivateKey: string;
+  /** VAPID contact (mailto: or https:) sent in the JWT `sub` claim. */
+  vapidContact: string;
 }
 
 /** Anything with string-or-undefined values: `process.env` or a Worker `env` binding. */
@@ -80,5 +86,8 @@ export function loadConfig(env: EnvSource = processEnv()): AppConfig {
     pollStreakThreshold: num(env, "POLL_STREAK_THRESHOLD", 3),
     healthStaleAfterMin: num(env, "HEALTH_STALE_AFTER_MIN", 30),
     syncSecret: str(env, "SYNC_SECRET", ""),
+    vapidPublicKey: str(env, "VAPID_PUBLIC_KEY", ""),
+    vapidPrivateKey: str(env, "VAPID_PRIVATE_KEY", ""),
+    vapidContact: str(env, "VAPID_CONTACT", "mailto:admin@example.com"),
   };
 }
