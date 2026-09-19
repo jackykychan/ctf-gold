@@ -7,7 +7,7 @@ const validBody = {
     endpoint: "https://push.example.com/abc",
     keys: { p256dh: "BPK...", auth: "AUTH..." },
   },
-  prefs: { everyUpdate: true, series: "buy", upTarget: 53000 },
+  prefs: { everyUpdate: true, series: "buy", targets: { buy: { up: 43000, down: null } } },
 };
 
 test("toPushSubscription accepts a valid body and normalizes prefs", () => {
@@ -18,9 +18,8 @@ test("toPushSubscription accepts a valid body and normalizes prefs", () => {
   assert.deepEqual(sub.prefs, {
     everyUpdate: true,
     dailyHigh: false,
-    upTarget: 53000,
-    downTarget: null,
     series: "buy",
+    targets: { sell: { up: null, down: null }, buy: { up: 43000, down: null } },
     locale: "en",
   });
 });
@@ -34,21 +33,37 @@ test("toPushSubscription rejects a malformed subscription", () => {
   );
 });
 
-test("normalizePrefs coerces types and clamps targets", () => {
-  assert.deepEqual(normalizePrefs({ series: "nonsense", upTarget: "53000", downTarget: -5, locale: "zh-Hant" }), {
-    everyUpdate: false,
-    dailyHigh: false,
-    upTarget: 53000, // numeric string coerced + rounded
-    downTarget: null, // non-positive -> null
-    series: "sell", // invalid enum -> default
-    locale: "zh-Hant",
-  });
+test("normalizePrefs coerces types and clamps per-series targets", () => {
+  assert.deepEqual(
+    normalizePrefs({
+      series: "nonsense",
+      targets: { sell: { up: "53000", down: -5 }, buy: { up: 43000 } },
+      locale: "zh-Hant",
+    }),
+    {
+      everyUpdate: false,
+      dailyHigh: false,
+      series: "sell", // invalid enum -> default
+      targets: {
+        sell: { up: 53000, down: null }, // numeric string coerced; non-positive -> null
+        buy: { up: 43000, down: null },
+      },
+      locale: "zh-Hant",
+    },
+  );
   assert.deepEqual(normalizePrefs(undefined), {
     everyUpdate: false,
     dailyHigh: false,
-    upTarget: null,
-    downTarget: null,
     series: "sell",
+    targets: { sell: { up: null, down: null }, buy: { up: null, down: null } },
     locale: "en",
+  });
+});
+
+test("normalizePrefs maps legacy flat upTarget/downTarget onto the sell series", () => {
+  const p = normalizePrefs({ upTarget: "50000", downTarget: 40000 });
+  assert.deepEqual(p.targets, {
+    sell: { up: 50000, down: 40000 },
+    buy: { up: null, down: null },
   });
 });

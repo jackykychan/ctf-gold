@@ -100,7 +100,13 @@ test("push subscriptions upsert/list/delete round-trip", async () => {
   const repo = createRepository(createDb(":memory:"));
   assert.deepEqual(await repo.listSubscriptions(), []);
 
-  const prefs = { everyUpdate: true, dailyHigh: false, upTarget: 53000, downTarget: null, series: "sell" as const, locale: "en" as const };
+  const prefs = {
+    everyUpdate: true,
+    dailyHigh: false,
+    series: "sell" as const,
+    targets: { sell: { up: 53000, down: null }, buy: { up: null, down: null } },
+    locale: "en" as const,
+  };
   await repo.upsertSubscription("https://p/e1", "P1", "A1", prefs, "2026-09-12T00:00:00Z");
   const subs = await repo.listSubscriptions();
   assert.equal(subs.length, 1);

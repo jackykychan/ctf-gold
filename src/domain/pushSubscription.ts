@@ -1,4 +1,4 @@
-import type { AlertPrefs, AlertSeries, PushLocale, StoredSubscription } from "../shared/push";
+import type { AlertPrefs, AlertSeries, PushLocale, SeriesTargets, StoredSubscription } from "../shared/push";
 
 /**
  * PURE. Validate and normalise a push-subscribe request body into a stored
@@ -20,15 +20,25 @@ function normalizeLocale(v: unknown): PushLocale {
   return v === "zh-Hant" ? "zh-Hant" : "en";
 }
 
+function normalizeTargets(raw: unknown): SeriesTargets {
+  const t = (raw ?? {}) as Record<string, unknown>;
+  return { up: normalizeTarget(t.up), down: normalizeTarget(t.down) };
+}
+
 /** Coerce an arbitrary object into safe AlertPrefs (never throws). */
 export function normalizePrefs(raw: unknown): AlertPrefs {
   const p = (raw ?? {}) as Record<string, unknown>;
+  const t = (p.targets ?? {}) as Record<string, unknown>;
+  const sell = normalizeTargets(t.sell);
+  const buy = normalizeTargets(t.buy);
+  // Back-compat: a legacy flat upTarget/downTarget maps onto the sell series.
+  if (sell.up == null) sell.up = normalizeTarget(p.upTarget);
+  if (sell.down == null) sell.down = normalizeTarget(p.downTarget);
   return {
     everyUpdate: p.everyUpdate === true,
     dailyHigh: p.dailyHigh === true,
-    upTarget: normalizeTarget(p.upTarget),
-    downTarget: normalizeTarget(p.downTarget),
     series: normalizeSeries(p.series),
+    targets: { sell, buy },
     locale: normalizeLocale(p.locale),
   };
 }

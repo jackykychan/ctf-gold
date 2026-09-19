@@ -107,6 +107,9 @@
     color: var(--foreground);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK",
       "Microsoft JhengHei", Roboto, Helvetica, Arial, sans-serif;
+    /* Disable double-tap-to-zoom (and other non-standard tap gestures) while
+       keeping scrolling and pinch-zoom — avoids accidental zoom on quick taps. */
+    touch-action: manipulation;
     /* With viewport-fit=cover the page fills the whole screen; keep content out
        of the notch / status bar / home-indicator areas. env() is 0 elsewhere. */
     padding-top: env(safe-area-inset-top);

@@ -26,20 +26,21 @@ export function evaluateAlerts(prefs: AlertPrefs, event: AlertEvent): PushPayloa
   if (prefs.series !== "both" && prefs.series !== event.series) return null;
 
   const { price, prevPrice } = event;
+  const target = prefs.targets[event.series]; // per-series rise-to / drop-to
   let reason: AlertReason | null = null;
 
   if (
-    prefs.upTarget != null &&
+    target.up != null &&
     prevPrice != null &&
-    prevPrice < prefs.upTarget &&
-    price >= prefs.upTarget
+    prevPrice < target.up &&
+    price >= target.up
   ) {
     reason = "up";
   } else if (
-    prefs.downTarget != null &&
+    target.down != null &&
     prevPrice != null &&
-    prevPrice > prefs.downTarget &&
-    price <= prefs.downTarget
+    prevPrice > target.down &&
+    price <= target.down
   ) {
     reason = "down";
   } else if (prefs.dailyHigh && event.isDailyHigh) {
