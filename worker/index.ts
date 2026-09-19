@@ -3,7 +3,7 @@ import { CANONICAL_SERIES_KEY, loadConfig, seriesByKey, type EnvSource } from ".
 import { createHistoryService } from "../src/services/historyService";
 import { createApiRouter } from "../src/http/api";
 import { runPollOnce } from "../src/pollCore";
-import { evaluateAlerts } from "../src/domain/pushAlerts";
+import { planPushDeliveries } from "../src/domain/pushFanout";
 import { META_LAST_POLLED } from "../src/shared/types";
 import { createD1Repository } from "./d1Repository";
 import { sendPush } from "./webPush";
@@ -101,37 +101,15 @@ async function fanOutPush(
   ctx: ExecutionContext,
 ): Promise<void> {
   const subs = await repository.listSubscriptions();
-  if (subs.length === 0) return;
+  const deliveries = await planPushDeliveries(repository, insertedPoints, subs);
+  if (deliveries.length === 0) return;
 
-  const sends: Promise<void>[] = [];
-  for (const pt of insertedPoints) {
-    // A new daily high = strictly above the max of earlier points on the same
-    // day (first point of the day counts as a new high).
-    const dayStart = `${pt.updateDate.slice(0, 10)} 00:00:00`;
-    const { rows } = await repository.historyWindow(pt.code, dayStart);
-    const earlierMax = rows
-      .filter((r) => r.updateDate < pt.updateDate)
-      .reduce((m, r) => Math.max(m, r.price), 0);
-    const isDailyHigh = pt.price > earlierMax;
-
-    const event = {
-      series: pt.key,
-      price: pt.price,
-      prevPrice: pt.prevPrice,
-      isDailyHigh,
-      updateDate: pt.updateDate,
-    };
-    for (const sub of subs) {
-      const payload = evaluateAlerts(sub.prefs, event);
-      if (!payload) continue;
-      sends.push(
-        sendPush(sub, payload, config)
-          .then(async (status) => {
-            if (status === 404 || status === 410) await repository.deleteSubscription(sub.endpoint);
-          })
-          .catch((err) => console.error(`Push failed: ${(err as Error).message}`)),
-      );
-    }
-  }
+  const sends = deliveries.map((d) =>
+    sendPush(d.subscription, d.payload, config)
+      .then(async (status) => {
+        if (status === 404 || status === 410) await repository.deleteSubscription(d.subscription.endpoint);
+      })
+      .catch((err) => console.error(`Push failed: ${(err as Error).message}`)),
+  );
   ctx.waitUntil(Promise.all(sends));
 }

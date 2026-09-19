@@ -1,5 +1,13 @@
 # Gold Price Tracker (Chow Tai Fook, HK)
 
+[![CI](https://github.com/jackykychan/ctf-gold/actions/workflows/ci.yml/badge.svg)](https://github.com/jackykychan/ctf-gold/actions/workflows/ci.yml)
+
+<!-- TEST-RESULTS:START -->
+
+✅ **89/89 tests passing** · **98.54% line coverage** · updated 2026-09-19
+
+<!-- TEST-RESULTS:END -->
+
 A small dashboard that tracks Chow Tai Fook's **9999 gold** Buy/Sell prices
 (飾金賣出價 / 飾金買入價) over time and shows every intraday change. A single Node
 process polls the public API on an adaptive schedule, stores each new price in
