@@ -8,7 +8,7 @@
     "node": ">=20.6"
   },
   "scripts": {
-    "dev": "concurrently -k -n server,web,css \"tsx watch src/server.ts\" \"npm:dev:web\" \"npm:dev:css\"",
+    "dev": "concurrently -k -n server,web,css \"DEV=true tsx watch src/server.ts\" \"npm:dev:web\" \"npm:dev:css\"",
     "dev:web": "esbuild web/main.tsx --bundle --format=esm --sourcemap --outfile=public/app.js --tsconfig=tsconfig.web.json --jsx=automatic --define:process.env.NODE_ENV=\\\"development\\\" --watch",
     "dev:css": "tailwindcss -i web/index.css -o public/styles.css --watch",
     "dev:worker": "npm run build:web && npm run build:css && wrangler dev",

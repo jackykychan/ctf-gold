@@ -46,7 +46,7 @@ npm run dev:worker        # builds the frontend, then `wrangler dev` -> http://l
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Local Node (Hono) server + React bundle + Tailwind, watch mode. |
+| `npm run dev` | Local Node (Hono) server + React bundle + Tailwind, watch mode with **browser live-reload** (auto-refresh on rebuild); reads `.dev.vars` so Web Push works locally too. |
 | `npm run dev:worker` | Build frontend, then run the Worker + local D1 via `wrangler dev`. |
 | `npm run build` | Compile backend to `dist/` (local), bundle `public/app.js`, build `public/styles.css`. |
 | `npm run typecheck` | Type-check backend, frontend, and Worker (three tsconfigs). |
