@@ -55,6 +55,16 @@ function playDrawReveal(chart: Chart): void {
   state.raf = requestAnimationFrame(tick);
 }
 
+// Snap the current chart state into place (no morphing) then unveil it
+// left-to-right. Used on first render, filter changes and legend toggles.
+function revealDraw(chart: Chart): void {
+  const state = drawStateOf(chart);
+  chart.options.animation = false;
+  state.clip = 0;
+  chart.update("none");
+  playDrawReveal(chart);
+}
+
 export function createPriceChart(canvas: HTMLCanvasElement): Chart {
   return new Chart(canvas, {
     type: "line",
@@ -77,7 +87,26 @@ export function createPriceChart(canvas: HTMLCanvasElement): Chart {
         },
         y: { ticks: { callback: (v) => Number(v).toLocaleString() } },
       },
-      plugins: { legend: { display: true, position: "top" } },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          // Toggle a series' line and re-draw it left-to-right; never allow
+          // hiding the last visible series (which would blank the chart).
+          onClick: (_e, legendItem, legend) => {
+            const chart = legend.chart;
+            const index = legendItem.datasetIndex ?? 0;
+            const visible = chart.isDatasetVisible(index);
+            const visibleCount = chart.data.datasets.reduce(
+              (n, _d, i) => n + (chart.isDatasetVisible(i) ? 1 : 0),
+              0,
+            );
+            if (visible && visibleCount <= 1) return; // keep at least one line
+            chart.setDatasetVisibility(index, !visible);
+            revealDraw(chart);
+          },
+        },
+      },
     },
   });
 }
@@ -138,12 +167,8 @@ export function updateChart(
 
   const state = drawStateOf(chart);
   if (animate) {
-    // Snap the final curve into place (no point morphing), then unveil it
-    // left-to-right. Used on first render and whenever a filter changes.
-    chart.options.animation = false;
-    state.clip = 0;
-    chart.update("none");
-    playDrawReveal(chart);
+    // Left-to-right unveil on first render and whenever a filter changes.
+    revealDraw(chart);
   } else {
     // Background refresh: quick, plain transition; no re-draw wipe.
     if (state.raf) cancelAnimationFrame(state.raf);
