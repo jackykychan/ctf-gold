@@ -23,6 +23,17 @@ const STRINGS = {
   },
 };
 
+// Activate notification-format updates immediately. Without skipWaiting, a
+// newly deployed worker can remain in "waiting" while an older tab is open,
+// leaving pushes rendered by stale code.
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 function fmtPrice(n, locale) {
   try {
     return new Intl.NumberFormat(locale === "zh-Hant" ? "zh-HK" : "en-HK").format(n);

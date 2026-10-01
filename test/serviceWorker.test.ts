@@ -1,10 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderPushNotification } from "./helpers/serviceWorkerHarness";
+import {
+  dispatchWorkerEvent,
+  loadServiceWorker,
+  renderPushNotification,
+} from "./helpers/serviceWorkerHarness";
 
 async function notificationBody(payload: Record<string, unknown>): Promise<string> {
   return (await renderPushNotification(payload)).options.body;
 }
+
+test("new notification worker activates immediately instead of leaving stale formatting active", async () => {
+  const harness = loadServiceWorker();
+  await dispatchWorkerEvent(harness, "install");
+  await dispatchWorkerEvent(harness, "activate");
+  assert.deepEqual(harness.calls, { skipWaiting: 1, claim: 1 });
+});
 
 test("every notification reason includes signed change versus the previous price", async () => {
   const reasons = ["update", "dailyHigh", "up", "down"];

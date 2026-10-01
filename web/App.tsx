@@ -5,6 +5,7 @@ import { fetchHistory, fetchLatest } from "@/api";
 import type { ViewMode } from "@/chart";
 import { applyTheme, isThemeChoice, type ResolvedTheme, type ThemeChoice } from "@/theme";
 import { detectLocale, type Locale } from "@/i18n";
+import { applyPriceFavicon } from "@/favicon";
 import { Header } from "@/components/Header";
 import { LatestSummary } from "@/components/LatestSummary";
 import { Controls } from "@/components/Controls";
@@ -79,6 +80,13 @@ export function App() {
 
   useEffect(() => writeStore("view", mode), [mode]);
   useEffect(() => writeStore("range", range), [range]);
+
+  // Reflect the latest Sell move versus its immediately preceding observation
+  // in the browser-tab favicon (green up, red down, gold neutral).
+  useEffect(() => {
+    const sell = history?.series.sell;
+    applyPriceFavicon(sell?.[sell.length - 1]?.changePct);
+  }, [history]);
 
   const load = useCallback(async (): Promise<void> => {
     try {

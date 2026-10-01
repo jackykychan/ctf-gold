@@ -18,6 +18,7 @@ visitor — so the history is shared and persistent.
 
 - **Chart** of Buy + Sell (`originGoldPrice`, HKD per 兩) with 5D / 2W / 1M / 3M / 6M ranges.
 - **Buy / Sell / Both** toggle for both the chart and the change-cards.
+- **Dynamic tab favicon** showing whether the latest Sell price moved up, down, or stayed flat versus its previous observation.
 - **Stacked change-cards**, newest on top: price, timestamp, and % change vs the previous point.
 - **Adaptive polling** that catches intraday updates without hammering the API.
 - **Light / dark theme** (defaults to system) and **English / Traditional Chinese** (defaults to browser language), with **Lucide** icons in the shadcn/ui pickers.

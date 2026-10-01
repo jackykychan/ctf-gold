@@ -12,6 +12,26 @@ const initialPrefs = {
   locale: "en",
 };
 
+test("favicon reflects the newest Sell price movement", async ({ page }) => {
+  await page.route("**/api/history?**", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        range: "1m",
+        generatedAt: "2026-10-01T00:00:00.000Z",
+        series: {
+          sell: [{ t: "2026-10-01 08:00:00", price: 52_100, changePct: 0.19 }],
+          buy: [{ t: "2026-10-01 08:00:00", price: 42_000, changePct: 0.12 }],
+        },
+      }),
+    }),
+  );
+
+  await page.goto("/");
+  await expect(page.locator('link[rel~="icon"]')).toHaveAttribute("data-price-direction", "up");
+  await expect(page.locator('link[rel~="icon"]')).toHaveAttribute("href", /^data:image\/svg\+xml,/);
+});
+
 test("website language is persisted to an active notification subscription", async ({ page }) => {
   await page.addInitScript(
     ({ endpoint: fakeEndpoint, prefs }) => {
@@ -34,6 +54,12 @@ test("website language is persisted to an active notification subscription", asy
   );
 
   await page.goto("/");
+
+  const updateViaCache = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    return registration.updateViaCache;
+  });
+  expect(updateViaCache).toBe("none");
 
   // Wait until the real service worker is ready and the UI has discovered the
   // deterministic existing PushSubscription above.
