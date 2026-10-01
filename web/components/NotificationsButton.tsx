@@ -17,6 +17,7 @@ import {
   pushSupported,
   savePrefs,
 } from "@/push";
+import { syncPushLocale } from "@/pushLocale";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -78,10 +79,25 @@ export function NotificationsButton({ locale }: NotificationsButtonProps) {
     if (open) void fetchLatest().then(setLatest).catch(() => setLatest(null));
   }, [open]);
 
-  // Keep the stored locale in sync with the UI language.
+  // Keep both local preferences and the active server-side subscription in
+  // sync with the website language. The server stores the locale used later by
+  // background pushes, so changing language must persist even when the dialog
+  // is never opened.
   useEffect(() => {
-    setPrefs((p) => (p.locale === locale ? p : { ...p, locale }));
-  }, [locale]);
+    void syncPushLocale(
+      prefs,
+      locale,
+      enabled,
+      (next) => {
+        writePrefs(next);
+        if (next !== prefs) setPrefs(next);
+      },
+      savePrefs,
+    ).catch((err) => setNoteFromError(err));
+    // This synchronization is intentionally driven only by language and
+    // subscription state; other preference changes persist through change().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, enabled]);
 
   // Whether any actual alert is active (the Watch-price scope doesn't count).
   // For a single series only that series' targets count; for "both", either.

@@ -5,6 +5,8 @@ public/app.js
 public/app.js.map
 public/styles.css
 coverage/
+playwright-report/
+test-results/
 .env
 *.log
 .DS_Store

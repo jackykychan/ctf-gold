@@ -57,8 +57,10 @@ npm run dev:worker        # builds the frontend, then `wrangler dev` -> http://l
 | `npm run dev` | Local Node (Hono) server + React bundle + Tailwind, watch mode with **browser live-reload** (auto-refresh on rebuild); reads `.dev.vars` so Web Push works locally too. |
 | `npm run dev:worker` | Build frontend, then run the Worker + local D1 via `wrangler dev`. |
 | `npm run build` | Compile backend to `dist/` (local), bundle `public/app.js`, build `public/styles.css`. |
-| `npm run typecheck` | Type-check backend, frontend, and Worker (three tsconfigs). |
+| `npm run typecheck` | Type-check backend, frontend, Worker, and browser E2E tests. |
 | `npm test` | Run the unit/route tests (`node --test` via tsx). |
+| `npm run test:e2e` | Build the app and run the reliable Chromium E2E suite; use `:headed` or `:ui` for interactive debugging. |
+| `npm run test:report` | Run every unit, integration, and browser E2E test and generate user-friendly HTML + Markdown reports in `test-results/`. |
 | `npm run seed` | Insert synthetic 6-month history into the local SQLite (dev only). |
 | `npm run gen:vapid` | Print a fresh VAPID keypair for Web Push (see [Notifications](#notifications-web-push)). |
 | `npm run gen:icons` | Regenerate the PWA icons in `public/` (no image dependency). |

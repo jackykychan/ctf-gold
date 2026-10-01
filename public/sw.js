@@ -31,6 +31,32 @@ function fmtPrice(n, locale) {
   }
 }
 
+/** Signed change from the preceding observation, with direction at a glance. */
+function fmtChange(price, prevPrice, locale) {
+  if (
+    typeof price !== "number" ||
+    !Number.isFinite(price) ||
+    typeof prevPrice !== "number" ||
+    !Number.isFinite(prevPrice) ||
+    prevPrice === 0
+  ) {
+    return "";
+  }
+
+  const changePct = ((price - prevPrice) / prevPrice) * 100;
+  const direction = changePct > 0 ? "↑" : changePct < 0 ? "↓" : "→";
+  const sign = changePct > 0 ? "+" : "";
+  try {
+    const pct = new Intl.NumberFormat(locale === "zh-Hant" ? "zh-HK" : "en-HK", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(changePct);
+    return ` (${direction} ${sign}${pct}%)`;
+  } catch (_) {
+    return ` (${direction} ${sign}${changePct.toFixed(2)}%)`;
+  }
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -42,11 +68,12 @@ self.addEventListener("push", (event) => {
   const s = STRINGS[locale];
   const series = data.series === "buy" ? s.buy : s.sell;
   const price = fmtPrice(data.price, locale);
+  const change = fmtChange(data.price, data.prevPrice, locale);
   const make = s[data.reason] || s.update;
 
   event.waitUntil(
     self.registration.showNotification(s.title, {
-      body: make(series, price),
+      body: make(series, price) + change,
       tag: "ctf-gold-" + (data.series || "sell"),
       icon: "/icon-192.png",
       badge: "/icon-192.png",

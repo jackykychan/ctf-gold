@@ -28,14 +28,48 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check (backend + frontend)
-        run: npm run typecheck
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
 
-      - name: Run tests
-        run: npm test
+      - name: Type-check application and tests
+        run: npm run typecheck
 
       - name: Build (server + web bundle + CSS)
         run: npm run build
+
+      - name: Run all tests and generate report
+        id: full-tests
+        continue-on-error: true
+        run: npm run test:report:ci
+
+      - name: Add test report to job summary
+        if: ${{ always() }}
+        run: |
+          if [ -f test-results/test-report.md ]; then
+            cat test-results/test-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload combined test report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-test-report
+          path: |
+            test-results/test-report.html
+            test-results/test-report.md
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload browser debug artifacts on failure
+        if: ${{ steps.full-tests.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-debug-artifacts
+          path: |
+            test-results/**/trace.zip
+            test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7
 
       # Publish live test results into the README on pushes to main. Runs even
       # if a prior step failed, so a red result is recorded too. The commit is
@@ -56,3 +90,7 @@ jobs:
             git commit -m "docs: update test results [skip ci]"
             git push
           fi
+
+      - name: Enforce test result
+        if: ${{ steps.full-tests.outcome == 'failure' }}
+        run: exit 1
