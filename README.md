@@ -4,7 +4,7 @@
 
 <!-- TEST-RESULTS:START -->
 
-✅ **96/96 tests passing** · **99.02% line coverage** · updated 2026-10-01
+✅ **100/100 tests passing** · **99.05% line coverage** · updated 2026-10-01
 
 <!-- TEST-RESULTS:END -->
 
