@@ -13,21 +13,22 @@ export interface AlertEvent {
 }
 
 /**
- * PURE. Decide whether an event should notify a subscription and why. Returns
- * the push payload to send, or null if no configured alert matched.
+ * PURE. Decide which configured alerts match an event. Returns one push payload
+ * per matching setting, or an empty array if no configured alert matched.
  *
  * Threshold alerts are crossing-based (prev below/above → new at/through the
  * target), so they fire once per crossing and never re-fire while the price
  * stays past the target — no per-subscription "already fired" state needed.
- * Precedence when several match: up/down crossing > daily high > every update.
+ * Matching settings remain separate so, for example, crossing a target on a
+ * new daily high can produce target, daily-high, and every-update notifications.
  */
-export function evaluateAlerts(prefs: AlertPrefs, event: AlertEvent): PushPayload | null {
+export function evaluateAlerts(prefs: AlertPrefs, event: AlertEvent): PushPayload[] {
   // Series filter.
-  if (prefs.series !== "both" && prefs.series !== event.series) return null;
+  if (prefs.series !== "both" && prefs.series !== event.series) return [];
 
   const { price, prevPrice } = event;
   const target = prefs.targets[event.series]; // per-series rise-to / drop-to
-  let reason: AlertReason | null = null;
+  const reasons: AlertReason[] = [];
 
   if (
     target.up != null &&
@@ -35,27 +36,25 @@ export function evaluateAlerts(prefs: AlertPrefs, event: AlertEvent): PushPayloa
     prevPrice < target.up &&
     price >= target.up
   ) {
-    reason = "up";
-  } else if (
+    reasons.push("up");
+  }
+  if (
     target.down != null &&
     prevPrice != null &&
     prevPrice > target.down &&
     price <= target.down
   ) {
-    reason = "down";
-  } else if (prefs.dailyHigh && event.isDailyHigh) {
-    reason = "dailyHigh";
-  } else if (prefs.everyUpdate) {
-    reason = "update";
+    reasons.push("down");
   }
+  if (prefs.dailyHigh && event.isDailyHigh) reasons.push("dailyHigh");
+  if (prefs.everyUpdate) reasons.push("update");
 
-  if (reason === null) return null;
-  return {
+  return reasons.map((reason) => ({
     series: event.series,
     price,
     prevPrice,
     reason,
     updateDate: event.updateDate,
     locale: prefs.locale,
-  };
+  }));
 }

@@ -60,6 +60,21 @@ test("everyUpdate, daily-high and crossing subs all match a new-high sell point"
   assert.equal(byEndpoint["https://p/buyonly"], undefined); // buy series ignores sell point
 });
 
+test("one subscription receives a separate delivery for every matching setting", async () => {
+  const repo = await repoWithEarlierSell(50000);
+  const allAlerts = sub("https://p/all", {
+    everyUpdate: true,
+    dailyHigh: true,
+    targets: { sell: { up: 51000, down: null }, buy: { up: null, down: null } },
+  });
+
+  const out = await planPushDeliveries(repo, [sellPoint], [allAlerts]);
+
+  assert.equal(out.length, 3);
+  assert.deepEqual(out.map((delivery) => delivery.payload.reason), ["up", "dailyHigh", "update"]);
+  assert.ok(out.every((delivery) => delivery.subscription.endpoint === "https://p/all"));
+});
+
 test("daily-high does not fire when the point is below an earlier high", async () => {
   const repo = await repoWithEarlierSell(52000); // earlier max 52,000 > new 51,000
   const subs = [sub("https://p/high", { dailyHigh: true }), sub("https://p/every", { everyUpdate: true })];

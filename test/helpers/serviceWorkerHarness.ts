@@ -9,7 +9,7 @@ type WorkerHandler = (event: WorkerEvent) => void;
 
 export interface RenderedNotification {
   title: string;
-  options: { body: string };
+  options: { body: string; tag: string };
 }
 
 export interface ServiceWorkerHarness {
@@ -36,7 +36,7 @@ export function loadServiceWorker(): ServiceWorkerHarness {
       },
     },
     registration: {
-      async showNotification(title: string, options: { body: string }) {
+      async showNotification(title: string, options: { body: string; tag: string }) {
         notifications.push({ title, options });
       },
     },

@@ -31,6 +31,25 @@ test("every notification reason includes signed change versus the previous price
   }
 });
 
+test("each notification setting uses a distinct browser notification tag", async () => {
+  const tags = await Promise.all(
+    ["update", "dailyHigh", "up"].map(async (reason) =>
+      (await renderPushNotification({
+        series: "sell",
+        price: 53_000,
+        prevPrice: 52_900,
+        reason,
+        locale: "en",
+      })).options.tag,
+    ),
+  );
+  assert.deepEqual(tags, [
+    "ctf-gold-sell-update",
+    "ctf-gold-sell-dailyHigh",
+    "ctf-gold-sell-up",
+  ]);
+});
+
 test("notification change shows decreases and unchanged prices", async () => {
   const down = await notificationBody({
     series: "buy",

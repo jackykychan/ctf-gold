@@ -38,8 +38,8 @@ export async function planPushDeliveries(
       updateDate: pt.updateDate,
     };
     for (const sub of subscriptions) {
-      const payload = evaluateAlerts(sub.prefs, event);
-      if (payload) deliveries.push({ subscription: sub, payload });
+      const payloads = evaluateAlerts(sub.prefs, event);
+      for (const payload of payloads) deliveries.push({ subscription: sub, payload });
     }
   }
   return deliveries;

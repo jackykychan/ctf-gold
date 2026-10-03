@@ -85,7 +85,10 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(s.title, {
       body: make(series, price) + change,
-      tag: "ctf-gold-" + (data.series || "sell"),
+      // Keep one visible notification per setting. A later notification for
+      // the same series and reason replaces its older one, while simultaneous
+      // target, daily-high, and every-update alerts remain separate.
+      tag: "ctf-gold-" + (data.series || "sell") + "-" + (data.reason || "update"),
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: "/" },

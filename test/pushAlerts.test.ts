@@ -32,56 +32,56 @@ const event = (over: Partial<AlertEvent>): AlertEvent => ({
 
 test("everyUpdate notifies on any new point", () => {
   const out = evaluateAlerts(prefs({ everyUpdate: true }), event({}));
-  assert.equal(out?.reason, "update");
-  assert.equal(out?.series, "sell");
+  assert.equal(out[0]?.reason, "update");
+  assert.equal(out[0]?.series, "sell");
 });
 
 test("series filter: mismatched series yields no notification", () => {
-  assert.equal(evaluateAlerts(prefs({ everyUpdate: true, series: "buy" }), event({ series: "sell" })), null);
+  assert.deepEqual(evaluateAlerts(prefs({ everyUpdate: true, series: "buy" }), event({ series: "sell" })), []);
 });
 
 test("series 'both' matches sell and buy", () => {
-  assert.ok(evaluateAlerts(prefs({ everyUpdate: true, series: "both" }), event({ series: "sell" })));
-  assert.ok(evaluateAlerts(prefs({ everyUpdate: true, series: "both" }), event({ series: "buy" })));
+  assert.equal(evaluateAlerts(prefs({ everyUpdate: true, series: "both" }), event({ series: "sell" })).length, 1);
+  assert.equal(evaluateAlerts(prefs({ everyUpdate: true, series: "both" }), event({ series: "buy" })).length, 1);
 });
 
 test("dailyHigh notifies only when the point is a new daily high", () => {
-  assert.equal(evaluateAlerts(prefs({ dailyHigh: true }), event({ isDailyHigh: false })), null);
-  assert.equal(evaluateAlerts(prefs({ dailyHigh: true }), event({ isDailyHigh: true }))?.reason, "dailyHigh");
+  assert.deepEqual(evaluateAlerts(prefs({ dailyHigh: true }), event({ isDailyHigh: false })), []);
+  assert.equal(evaluateAlerts(prefs({ dailyHigh: true }), event({ isDailyHigh: true }))[0]?.reason, "dailyHigh");
 });
 
 test("up target fires on the crossing, not while already above", () => {
   const p = prefs({ targets: withTarget("sell", { up: 53000 }) });
   // prev below, new at/above target -> crossing up.
-  assert.equal(evaluateAlerts(p, event({ prevPrice: 52900, price: 53000 }))?.reason, "up");
+  assert.equal(evaluateAlerts(p, event({ prevPrice: 52900, price: 53000 }))[0]?.reason, "up");
   // already above on the previous point -> no re-fire.
-  assert.equal(evaluateAlerts(p, event({ prevPrice: 53100, price: 53200 })), null);
+  assert.deepEqual(evaluateAlerts(p, event({ prevPrice: 53100, price: 53200 })), []);
   // first point (no prev) cannot cross.
-  assert.equal(evaluateAlerts(p, event({ prevPrice: null, price: 53500 })), null);
+  assert.deepEqual(evaluateAlerts(p, event({ prevPrice: null, price: 53500 })), []);
 });
 
 test("down target fires on the crossing, not while already below", () => {
   const p = prefs({ targets: withTarget("sell", { down: 52000 }) });
-  assert.equal(evaluateAlerts(p, event({ prevPrice: 52100, price: 52000 }))?.reason, "down");
-  assert.equal(evaluateAlerts(p, event({ prevPrice: 51900, price: 51800 })), null);
+  assert.equal(evaluateAlerts(p, event({ prevPrice: 52100, price: 52000 }))[0]?.reason, "down");
+  assert.deepEqual(evaluateAlerts(p, event({ prevPrice: 51900, price: 51800 })), []);
 });
 
 test("targets are per-series: a sell target ignores buy events and vice versa", () => {
   const p = prefs({ targets: withTarget("sell", { up: 53000 }) });
   // A buy event near the (much lower) buy level must not fire the sell target.
-  assert.equal(evaluateAlerts(p, event({ series: "buy", prevPrice: 52900, price: 53000 }))?.reason ?? null, null);
+  assert.deepEqual(evaluateAlerts(p, event({ series: "buy", prevPrice: 52900, price: 53000 })), []);
   // The buy target fires on a buy event.
   const pb = prefs({ targets: withTarget("buy", { up: 43000 }) });
-  assert.equal(evaluateAlerts(pb, event({ series: "buy", prevPrice: 42900, price: 43000 }))?.reason, "up");
-  assert.equal(evaluateAlerts(pb, event({ series: "sell", prevPrice: 42900, price: 43000 })), null);
+  assert.equal(evaluateAlerts(pb, event({ series: "buy", prevPrice: 42900, price: 43000 }))[0]?.reason, "up");
+  assert.deepEqual(evaluateAlerts(pb, event({ series: "sell", prevPrice: 42900, price: 43000 })), []);
 });
 
-test("threshold crossing takes precedence over daily-high/every-update", () => {
+test("each matching setting produces a separate notification payload", () => {
   const p = prefs({ everyUpdate: true, dailyHigh: true, targets: withTarget("sell", { up: 53000 }) });
   const out = evaluateAlerts(p, event({ prevPrice: 52900, price: 53000, isDailyHigh: true }));
-  assert.equal(out?.reason, "up");
+  assert.deepEqual(out.map((payload) => payload.reason), ["up", "dailyHigh", "update"]);
 });
 
-test("no matching alert yields null", () => {
-  assert.equal(evaluateAlerts(prefs({}), event({})), null);
+test("no matching alert yields an empty list", () => {
+  assert.deepEqual(evaluateAlerts(prefs({}), event({})), []);
 });
